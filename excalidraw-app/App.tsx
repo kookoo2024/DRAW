@@ -80,6 +80,149 @@ polyfill();
 
 window.EXCALIDRAW_THROTTLE_RENDER = true;
 
+/**
+ * 把工具栏改造成可拖动浮窗：
+ * - 注入一个拖动手柄（⠿）到工具栏最左侧
+ * - pointerdown/move/up 实现拖动，更新 CSS 变量 --tb-left/--tb-top
+ * - 双击手柄重置到底部居中
+ * - 位置持久化到 localStorage
+ * 返回一个 cleanup 函数（移除手柄 + 解绑事件）
+ */
+const setupDraggableToolbar = (
+  toolbar: HTMLDivElement,
+  storageKey: string,
+): (() => void) => {
+  // 已注入过则不重复
+  if (toolbar.querySelector(".toolbar-drag-handle")) {
+    return () => {};
+  }
+
+  // 创建手柄（6 个圆点，竖向排列）
+  const handle = document.createElement("div");
+  handle.className = "toolbar-drag-handle";
+  handle.title = "拖动移动工具栏 · 双击重置到底部居中";
+  for (let i = 0; i < 6; i++) {
+    const dot = document.createElement("div");
+    dot.className = "toolbar-drag-handle__dot";
+    handle.appendChild(dot);
+  }
+  toolbar.insertBefore(handle, toolbar.firstChild);
+
+  // 恢复上次保存的位置（存的是工具栏左上角坐标）
+  const restorePos = () => {
+    try {
+      const saved = localStorage.getItem(storageKey);
+      if (saved) {
+        const { x, y } = JSON.parse(saved);
+        applyCustomPos(x, y);
+      }
+    } catch {
+      // ignore
+    }
+  };
+
+  // 应用自定义位置（切到 custom-pos 态）
+  // x, y = 工具栏左上角的视口坐标（对应 CSS left/top）
+  const applyCustomPos = (x: number, y: number) => {
+    toolbar.classList.add("toolbar-custom-pos");
+    toolbar.style.setProperty("--tb-left", `${x}px`);
+    toolbar.style.setProperty("--tb-top", `${y}px`);
+  };
+
+  // 重置到底部居中
+  const resetPos = () => {
+    toolbar.classList.remove("toolbar-custom-pos");
+    toolbar.style.removeProperty("--tb-left");
+    toolbar.style.removeProperty("--tb-top");
+    localStorage.removeItem(storageKey);
+  };
+
+  restorePos();
+
+  // 拖动逻辑：记录鼠标相对工具栏左上角的偏移，拖动时保持该偏移不变
+  // 这样手柄始终贴着鼠标，符合直觉，不会"崩跑"
+  let dragging = false;
+  let grabOffsetX = 0; // 鼠标按下时，相对工具栏左上角的 x 偏移
+  let grabOffsetY = 0; // 鼠标按下时，相对工具栏左上角的 y 偏移
+
+  const onPointerDown = (e: PointerEvent) => {
+    if (e.button !== 0) {
+      return;
+    }
+    e.preventDefault();
+    e.stopPropagation();
+    dragging = true;
+    handle.classList.add("dragging");
+    const rect = toolbar.getBoundingClientRect();
+    // 关键：记录鼠标抓的是工具栏的哪个位置
+    grabOffsetX = e.clientX - rect.left;
+    grabOffsetY = e.clientY - rect.top;
+    // 立即切到自定义位置态（即使没移动也固定当前位置，避免跳动）
+    applyCustomPos(rect.left, rect.top);
+    window.addEventListener("pointermove", onPointerMove);
+    window.addEventListener("pointerup", onPointerUp);
+  };
+
+  const onPointerMove = (e: PointerEvent) => {
+    if (!dragging) {
+      return;
+    }
+    e.preventDefault();
+    // 工具栏左上角 = 鼠标位置 - 抓取偏移
+    // 这样手柄跟随鼠标，工具栏整体不跳动
+    const newX = e.clientX - grabOffsetX;
+    const newY = e.clientY - grabOffsetY;
+    // 约束在视口内（保证至少留出一部分可见）
+    const w = toolbar.offsetWidth;
+    const h = toolbar.offsetHeight;
+    const minX = -w + 60; // 至少露出 60px
+    const maxX = window.innerWidth - 60;
+    const minY = 0;
+    const maxY = window.innerHeight - 40;
+    const clampedX = Math.max(minX, Math.min(maxX, newX));
+    const clampedY = Math.max(minY, Math.min(maxY, newY));
+    applyCustomPos(clampedX, clampedY);
+  };
+
+  const onPointerUp = () => {
+    if (!dragging) {
+      return;
+    }
+    dragging = false;
+    handle.classList.remove("dragging");
+    window.removeEventListener("pointermove", onPointerMove);
+    window.removeEventListener("pointerup", onPointerUp);
+    // 持久化左上角坐标
+    const rect = toolbar.getBoundingClientRect();
+    try {
+      localStorage.setItem(storageKey, JSON.stringify({ x: rect.left, y: rect.top }));
+    } catch {
+      // ignore
+    }
+  };
+
+  // 双击重置
+  const onDblClick = (e: MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    resetPos();
+  };
+
+  handle.addEventListener("pointerdown", onPointerDown);
+  handle.addEventListener("dblclick", onDblClick);
+
+  // 返回 cleanup
+  return () => {
+    handle.removeEventListener("pointerdown", onPointerDown);
+    handle.removeEventListener("dblclick", onDblClick);
+    window.removeEventListener("pointermove", onPointerMove);
+    window.removeEventListener("pointerup", onPointerUp);
+    if (handle.parentNode) {
+      handle.parentNode.removeChild(handle);
+    }
+  };
+};
+
 const initializeScene = async (opts: {
   excalidrawAPI: ExcalidrawImperativeAPI;
 }): Promise<{
@@ -392,6 +535,35 @@ const ExcalidrawWrapper = () => {
         },
       });
     }
+  }, [excalidrawAPI]);
+
+  // 浮动可拖动工具栏：注入拖动手柄 + 绑定拖动逻辑
+  // 位置持久化到 localStorage，刷新后恢复
+  useEffect(() => {
+    const STORAGE_KEY = "excalidraw-toolbar-pos";
+
+    // 等待工具栏 DOM 出现（核心库异步渲染）
+    let cleanup: (() => void) | null = null;
+    let attempts = 0;
+    const tryAttach = () => {
+      const toolbar = document.querySelector<HTMLDivElement>(
+        ".App-toolbar-container--floating",
+      );
+      if (toolbar) {
+        cleanup = setupDraggableToolbar(toolbar, STORAGE_KEY);
+        return;
+      }
+      if (++attempts < 40) {
+        setTimeout(tryAttach, 150);
+      }
+    };
+    tryAttach();
+
+    return () => {
+      if (cleanup) {
+        cleanup();
+      }
+    };
   }, [excalidrawAPI]);
 
   const localStorageQuotaExceeded = useAtomValue(localStorageQuotaExceededAtom);

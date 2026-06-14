@@ -322,9 +322,9 @@ const LayerUI = ({
                       <tunnels.WelcomeScreenToolbarHintTunnel.Out />
                     )}
                     <Stack.Col gap={spacing.toolbarColGap} align="start">
-                      <Stack.Row
+                        <Stack.Row
                         gap={spacing.toolbarRowGap}
-                        className={clsx("App-toolbar-container", {
+                        className={clsx("App-toolbar-container", "App-toolbar-container--floating", {
                           "zen-mode": appState.zenModeEnabled,
                         })}
                       >

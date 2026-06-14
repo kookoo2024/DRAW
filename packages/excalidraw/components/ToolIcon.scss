@@ -195,4 +195,70 @@
       height: var(--default-button-size);
     }
   }
+
+  // ===== 浮动工具栏（可拖动，默认底部居中）=====
+  .App-toolbar-container--floating {
+    position: fixed !important;
+    z-index: 4;
+    pointer-events: auto !important;
+    // 默认态：底部水平居中
+    left: 50% !important;
+    bottom: 1.5rem !important;
+    top: auto !important;
+    right: auto !important;
+    transform: translateX(-50%) !important;
+
+    // 自定义位置态（拖动后）：用 left/top 定位，取消 transform
+    &.toolbar-custom-pos {
+      left: var(--tb-left, 50%) !important;
+      top: var(--tb-top, auto) !important;
+      bottom: auto !important;
+      transform: none !important;
+    }
+
+    &.zen-mode {
+      display: none;
+    }
+  }
+
+  // 拖动手柄：竖向圆点，放工具栏最左侧
+  .toolbar-drag-handle {
+    display: flex !important;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    gap: 3px;
+    width: 14px;
+    height: var(--lg-button-size, 2.5rem);
+    margin-right: 2px;
+    margin-left: 2px;
+    cursor: grab;
+    opacity: 0.4;
+    flex-shrink: 0;
+    border-radius: var(--border-radius-lg);
+    transition: opacity 0.15s;
+    -webkit-tap-highlight-color: transparent;
+
+    &:hover {
+      opacity: 0.8;
+    }
+    &:active {
+      cursor: grabbing;
+      opacity: 1;
+    }
+
+    &__dot {
+      width: 3px;
+      height: 3px;
+      border-radius: 50%;
+      background-color: var(--icon-fill-color, #1b1b1f);
+      flex-shrink: 0;
+    }
+
+    // 双击手柄：重置到底部居中（JS 监听 dblclick）
+    &.dragging {
+      cursor: grabbing;
+      opacity: 1;
+    }
+  }
 }
