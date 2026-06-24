@@ -29,26 +29,37 @@ const SHARED_LIBRARY_URL = "/library.excalidrawlib";
  * library panel still work in-memory for the current session, but are not
  * persisted (the next load re-fetches the shared file).
  */
-export const SharedLibraryAdapter: LibraryPersistenceAdapter = {
-  async load() {
-    try {
-      const response = await fetch(SHARED_LIBRARY_URL, { cache: "no-cache" });
-      if (!response.ok) {
-        console.warn(
-          `[SharedLibraryAdapter] ${SHARED_LIBRARY_URL} returned ${response.status}, starting with empty library`,
-        );
-        return null;
-      }
-      const blob = await response.blob();
-      const libraryItems: LibraryItems_anyVersion =
-        await loadLibraryFromBlob(blob, "published");
-      return { libraryItems };
-    } catch (error: any) {
-      console.error(
-        `[SharedLibraryAdapter] failed to load ${SHARED_LIBRARY_URL}: ${error?.message}`,
+/**
+ * Fetches & parses the shared `.excalidrawlib` from the host root.
+ * Returns `null` on any failure (network error, non-OK status, parse error).
+ *
+ * Shared between the adapter's `load` (initial load on startup, via
+ * `useHandleLibrary`) and `reloadSharedLibrary` (manual reload triggered
+ * from the library panel's "Reload shared library" button).
+ */
+export const fetchSharedLibraryItems = async (): Promise<LibraryItems_anyVersion | null> => {
+  try {
+    const response = await fetch(SHARED_LIBRARY_URL, { cache: "no-cache" });
+    if (!response.ok) {
+      console.warn(
+        `[SharedLibraryAdapter] ${SHARED_LIBRARY_URL} returned ${response.status}, starting with empty library`,
       );
       return null;
     }
+    const blob = await response.blob();
+    return await loadLibraryFromBlob(blob, "published");
+  } catch (error: any) {
+    console.error(
+      `[SharedLibraryAdapter] failed to load ${SHARED_LIBRARY_URL}: ${error?.message}`,
+    );
+    return null;
+  }
+};
+
+export const SharedLibraryAdapter: LibraryPersistenceAdapter = {
+  async load() {
+    const libraryItems = await fetchSharedLibraryItems();
+    return libraryItems ? { libraryItems } : null;
   },
   async save(_data: LibraryPersistedData) {
     // no-op: shared library is read-only

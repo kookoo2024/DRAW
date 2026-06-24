@@ -18,7 +18,6 @@ import { useLibraryCache } from "../hooks/useLibraryItemSvg";
 import { useScrollPosition } from "../hooks/useScrollPosition";
 import { t } from "../i18n";
 
-import { LibraryMenuControlButtons } from "./LibraryMenuControlButtons";
 import { LibraryDropdownMenu } from "./LibraryMenuHeaderContent";
 import {
   LibraryMenuSection,
@@ -39,10 +38,8 @@ import { Button } from "./Button";
 import type { ExcalidrawLibraryIds } from "../data/types";
 
 import type {
-  ExcalidrawProps,
   LibraryItem,
   LibraryItems,
-  UIAppState,
 } from "../types";
 
 // using an odd number of items per batch so the rendering creates an irregular
@@ -58,22 +55,18 @@ export default function LibraryMenuItems({
   onAddToLibrary,
   onInsertLibraryItems,
   pendingElements,
-  theme,
-  id,
-  libraryReturnUrl,
   onSelectItems,
   selectedItems,
+  onReloadLibrary,
 }: {
   isLoading: boolean;
   libraryItems: LibraryItems;
   pendingElements: LibraryItem["elements"];
   onInsertLibraryItems: (libraryItems: LibraryItems) => void;
   onAddToLibrary: (elements: LibraryItem["elements"]) => void;
-  libraryReturnUrl: ExcalidrawProps["libraryReturnUrl"];
-  theme: UIAppState["theme"];
-  id: string;
   selectedItems: LibraryItem["id"][];
   onSelectItems: (id: LibraryItem["id"][]) => void;
+  onReloadLibrary?: () => void;
 }) {
   const editorInterface = useEditorInterface();
   const libraryContainerRef = useRef<HTMLDivElement>(null);
@@ -403,6 +396,7 @@ export default function LibraryMenuItems({
         <LibraryDropdownMenu
           selectedItems={selectedItems}
           onSelectItems={onSelectItems}
+          onReloadLibrary={onReloadLibrary}
           className="library-menu-dropdown-container--in-heading"
         />
       </div>
@@ -431,15 +425,6 @@ export default function LibraryMenuItems({
 
         {JSX_whenNotSearching}
         {JSX_whenSearching}
-
-        {IS_LIBRARY_EMPTY && (
-          <LibraryMenuControlButtons
-            style={{ padding: "16px 0", width: "100%" }}
-            id={id}
-            libraryReturnUrl={libraryReturnUrl}
-            theme={theme}
-          />
-        )}
       </Stack.Col>
     </div>
   );

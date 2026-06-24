@@ -40,7 +40,6 @@ import {
   useExcalidrawElements,
   useExcalidrawSetAppState,
 } from "./App";
-import { LibraryMenuControlButtons } from "./LibraryMenuControlButtons";
 import LibraryMenuItems from "./LibraryMenuItems";
 import Spinner from "./Spinner";
 
@@ -49,7 +48,6 @@ import "./LibraryMenu.scss";
 import type {
   LibraryItems,
   LibraryItem,
-  ExcalidrawProps,
   UIAppState,
   AppClassProperties,
 } from "../types";
@@ -67,10 +65,8 @@ const LibraryMenuContent = memo(
     pendingElements,
     onAddToLibrary,
     setAppState,
-    libraryReturnUrl,
+    onReloadLibrary,
     library,
-    id,
-    theme,
     selectedItems,
     onSelectItems,
   }: {
@@ -78,10 +74,8 @@ const LibraryMenuContent = memo(
     onInsertLibraryItems: (libraryItems: LibraryItems) => void;
     onAddToLibrary: () => void;
     setAppState: React.Component<any, UIAppState>["setState"];
-    libraryReturnUrl: ExcalidrawProps["libraryReturnUrl"];
+    onReloadLibrary?: () => void;
     library: Library;
-    id: string;
-    theme: UIAppState["theme"];
     selectedItems: LibraryItem["id"][];
     onSelectItems: (id: LibraryItem["id"][]) => void;
   }) => {
@@ -141,9 +135,6 @@ const LibraryMenuContent = memo(
       );
     }
 
-    const showBtn =
-      libraryItemsData.libraryItems.length > 0 || pendingElements.length > 0;
-
     return (
       <LibraryMenuWrapper>
         <LibraryMenuItems
@@ -152,21 +143,10 @@ const LibraryMenuContent = memo(
           onAddToLibrary={_onAddToLibrary}
           onInsertLibraryItems={onInsertLibraryItems}
           pendingElements={pendingElements}
-          id={id}
-          libraryReturnUrl={libraryReturnUrl}
-          theme={theme}
+          onReloadLibrary={onReloadLibrary}
           onSelectItems={onSelectItems}
           selectedItems={selectedItems}
         />
-        {showBtn && (
-          <LibraryMenuControlButtons
-            className="library-menu-control-buttons--at-bottom"
-            style={{ padding: "16px 12px 0 12px" }}
-            id={id}
-            libraryReturnUrl={libraryReturnUrl}
-            theme={theme}
-          />
-        )}
       </LibraryMenuWrapper>
     );
   },
@@ -333,10 +313,8 @@ export const LibraryMenu = memo(() => {
       onInsertLibraryItems={onInsertLibraryItems}
       onAddToLibrary={deselectItems}
       setAppState={setAppState}
-      libraryReturnUrl={appProps.libraryReturnUrl}
+      onReloadLibrary={appProps.onReloadLibrary}
       library={memoizedLibrary}
-      id={app.id}
-      theme={appState.theme}
       selectedItems={selectedItems}
       onSelectItems={setSelectedItems}
     />

@@ -156,7 +156,8 @@ export type ToolType =
   | "frame"
   | "magicframe"
   | "embeddable"
-  | "laser";
+  | "laser"
+  | "triangle";
 
 export type ElementOrToolType = ExcalidrawElementType | ToolType | "custom";
 
@@ -638,6 +639,15 @@ export interface ExcalidrawProps {
   gridModeEnabled?: boolean;
   objectsSnapModeEnabled?: boolean;
   libraryReturnUrl?: string;
+  /**
+   * Called when the user clicks the "Reload shared library" button in the
+   * library panel's dropdown menu. Host apps that back the library with a
+   * shared, read-only source (e.g. a `.excalidrawlib` served from the host)
+   * can implement this to re-fetch and replace the in-memory library.
+   *
+   * When omitted, the reload button is hidden.
+   */
+  onReloadLibrary?: () => void;
   theme?: Theme;
   // @TODO come with better API before v0.18.0
   name?: string;

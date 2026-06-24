@@ -423,7 +423,7 @@ export const DEFAULT_ELEMENT_PROPS: {
   strokeColor: COLOR_PALETTE.black,
   backgroundColor: COLOR_PALETTE.transparent,
   fillStyle: "solid",
-  strokeWidth: 2,
+  strokeWidth: STROKE_WIDTH.thin,
   strokeStyle: "solid",
   roughness: ROUGHNESS.artist,
   opacity: 100,
@@ -462,6 +462,7 @@ export const TOOL_TYPE = {
   magicframe: "magicframe",
   embeddable: "embeddable",
   laser: "laser",
+  triangle: "triangle",
 } as const;
 
 export const EDITOR_LS_KEYS = {

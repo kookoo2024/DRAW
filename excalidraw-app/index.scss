@@ -128,3 +128,64 @@
     }
   }
 }
+
+// ===========================================================================
+// 魔改 UI 调整
+// ===========================================================================
+
+.excalidraw {
+  // 1. 去掉右下角按钮：帮助按钮(?) + 加密图标(🔒)
+  .layer-ui__wrapper__footer-right {
+    display: none !important;
+  }
+  .encrypted-icon {
+    display: none !important;
+  }
+
+  // 2. 左侧属性面板变窄（默认 12.5rem → 9rem，腾出更多书写空间）
+  .App-menu__left {
+    width: 9rem !important;
+  }
+  // 属性面板内的色板弹窗也相应变窄
+  .selected-shape-actions {
+    .panelColumn {
+      min-width: auto;
+    }
+  }
+
+  // 3. 折叠区（透明度/图层/对齐/动作）样式
+  .selected-shape-actions__more {
+    margin-top: 0.5rem;
+
+    > summary {
+      cursor: pointer;
+      font-size: 0.75rem;
+      color: var(--text-primary-color);
+      opacity: 0.7;
+      padding: 0.25rem 0;
+      user-select: none;
+      list-style: none;
+      display: flex;
+      align-items: center;
+      gap: 0.25rem;
+
+      &::-webkit-details-marker {
+        display: none;
+      }
+      &::before {
+        content: "▶";
+        font-size: 0.6rem;
+        transition: transform 0.15s;
+      }
+    }
+
+    &[open] > summary::before {
+      transform: rotate(90deg);
+    }
+
+    // 展开时内容区域
+    > *:not(summary) {
+      margin-top: 0.5rem;
+    }
+  }
+}

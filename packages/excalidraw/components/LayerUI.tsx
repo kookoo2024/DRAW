@@ -350,11 +350,7 @@ const LayerUI = ({
                               title={t("toolBar.penMode")}
                               penDetected={appState.penDetected}
                             />
-                            <LockButton
-                              checked={appState.activeTool.locked}
-                              onChange={onLockToggle}
-                              title={t("toolBar.lock")}
-                            />
+                            {actionManager.renderAction("undo")}
 
                             <div className="App-toolbar__divider" />
 

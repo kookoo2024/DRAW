@@ -8081,6 +8081,10 @@ class App extends React.Component<AppProps, AppState> {
       );
     } else if (this.state.activeTool.type === "custom") {
       setCursorForShape(this.interactiveCanvas, this.state);
+    } else if (this.state.activeTool.type === "triangle") {
+      // 三角形工具：拖拽时用临时 rectangle 参与 generic 拖拽路径，
+      // pointerUp 时（见 finalizeTriangleOnPointerUp）替换为 3 点闭合 polygon line
+      this.createGenericElementOnPointerDown("rectangle", pointerDownState);
     } else if (
       this.state.activeTool.type === TOOL_TYPE.frame ||
       this.state.activeTool.type === TOOL_TYPE.magicframe
@@ -9566,6 +9570,75 @@ class App extends React.Component<AppProps, AppState> {
     }
   };
 
+  // 三角形工具：把拖拽过程中产生的临时 rectangle 替换为
+  // 3 点闭合的 polygon line 元素（顶点朝上的等腰三角形），
+  // 并完成选中三角形 + 切回首选选择工具 + 置空 newElement。
+  // 自理全部副作用，调用方之后应 return 跳过后续 generic finalize。
+  private finalizeTriangleOnPointerUp = (
+    tempRect: Extract<ExcalidrawElement, { type: "rectangle" }>,
+  ) => {
+    // 规范化负宽高（拖拽可能往左/上），得到左上角原点 + 正尺寸
+    const dims = getNormalizedDimensions(tempRect);
+    // 过小的尺寸（纯点击未拖拽）给默认大小
+    const width = dims.width < 5 ? 100 : dims.width;
+    const height = dims.height < 5 ? 100 : dims.height;
+
+    // 顶点朝上的等腰三角形，局部坐标（相对元素 x/y）。
+    // 第 4 个点回到顶点，满足 isValidPolygon（需 points.length > 3 且首尾相同）。
+    const points: readonly [LocalPoint, LocalPoint, LocalPoint, LocalPoint] = [
+      pointFrom<LocalPoint>(width / 2, 0),
+      pointFrom<LocalPoint>(0, height),
+      pointFrom<LocalPoint>(width, height),
+      pointFrom<LocalPoint>(width / 2, 0),
+    ];
+
+    const triangle = newLinearElement({
+      type: "line",
+      x: dims.x,
+      y: dims.y,
+      width,
+      height,
+      points,
+      polygon: true,
+      strokeColor: tempRect.strokeColor,
+      backgroundColor: tempRect.backgroundColor,
+      fillStyle: tempRect.fillStyle,
+      strokeWidth: tempRect.strokeWidth,
+      strokeStyle: tempRect.strokeStyle,
+      roughness: tempRect.roughness,
+      opacity: tempRect.opacity,
+      roundness: tempRect.roundness,
+      groupIds: tempRect.groupIds,
+      frameId: tempRect.frameId,
+      index: tempRect.index,
+      locked: tempRect.locked,
+    });
+
+    // 用新 line 元素替换数组中的临时 rectangle（replaceAllElements 会重建 id→element 映射）
+    this.scene.replaceAllElements(
+      this.scene.getElementsIncludingDeleted().map((el) =>
+        el.id === tempRect.id ? triangle : el,
+      ),
+    );
+
+    resetCursor(this.interactiveCanvas);
+    this.setState((prevState) => ({
+      newElement: null,
+      suggestedBinding: null,
+      activeTool: updateActiveTool(this.state, {
+        type: this.state.preferredSelectionTool.type,
+      }),
+      selectedElementIds: makeNextSelectedElementIds(
+        {
+          ...prevState.selectedElementIds,
+          [triangle.id]: true,
+        },
+        prevState,
+      ),
+    }));
+    this.scene.triggerUpdate();
+  };
+
   private createFrameElementOnPointerDown = (
     pointerDownState: PointerDownState,
     type: Extract<ToolType, "frame" | "magicframe">,
@@ -11018,6 +11091,18 @@ class App extends React.Component<AppProps, AppState> {
             newElement,
           ),
         );
+      }
+
+      // 三角形工具：在 generic finalize 之前，把临时 rectangle 替换为 polygon line 三角形，
+      // 并在内部完成选中 + 切回选择工具 + 置空 newElement，因此之后 return 跳过后续 generic finalize
+      // （后续代码引用的 newElement 仍是旧 rectangle，不能让它再作用于三角形）。
+      if (
+        activeTool.type === "triangle" &&
+        newElement &&
+        newElement.type === "rectangle"
+      ) {
+        this.finalizeTriangleOnPointerUp(newElement);
+        return;
       }
 
       if (newElement) {

@@ -36,7 +36,7 @@ export const getDefaultAppState = (): Omit<
     currentItemRoughness: DEFAULT_ELEMENT_PROPS.roughness,
     currentItemStartArrowhead: null,
     currentItemStrokeColor: DEFAULT_ELEMENT_PROPS.strokeColor,
-    currentItemRoundness: isTestEnv() ? "sharp" : "round",
+    currentItemRoundness: "sharp",
     currentItemArrowType: ARROW_TYPE.round,
     currentItemStrokeStyle: DEFAULT_ELEMENT_PROPS.strokeStyle,
     currentItemStrokeWidth: DEFAULT_ELEMENT_PROPS.strokeWidth,
@@ -108,7 +108,7 @@ export const getDefaultAppState = (): Omit<
     viewBackgroundColor: COLOR_PALETTE.white,
     zenModeEnabled: false,
     zoom: {
-      value: 1 as NormalizedZoomValue,
+      value: 0.68 as NormalizedZoomValue,
     },
     viewModeEnabled: false,
     showHyperlinkPopup: false,

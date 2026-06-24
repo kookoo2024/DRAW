@@ -27,3 +27,6 @@ dev-dist
 html
 meta*.json
 .claude
+
+# Windows 误生成的空文件
+nul

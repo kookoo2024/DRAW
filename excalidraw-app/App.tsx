@@ -39,6 +39,7 @@ import type {
   ExcalidrawInitialDataState,
   UIAppState,
   ExcalidrawProps,
+  NormalizedZoomValue,
 } from "@excalidraw/excalidraw/types";
 import type { ResolutionType } from "@excalidraw/common/utility-types";
 import type { ResolvablePromise } from "@excalidraw/common/utils";
@@ -69,7 +70,10 @@ import { getPreferredLanguage } from "./app-language/language-detector";
 import { useAppLangCode } from "./app-language/language-state";
 
 // shared, read-only library adapter — loads /library.excalidrawlib from public/
-import { SharedLibraryAdapter } from "./data/SharedLibraryAdapter";
+import {
+  SharedLibraryAdapter,
+  fetchSharedLibraryItems,
+} from "./data/SharedLibraryAdapter";
 
 import { useAtomValue } from "./app-jotai";
 import { AppFooter } from "./components/AppFooter";
@@ -238,7 +242,11 @@ const initializeScene = async (opts: {
       repairBindings: true,
       deleteInvisibleElements: true,
     }),
-    appState: restoreAppState(localDataState?.appState, null),
+    appState: {
+      ...restoreAppState(localDataState?.appState, null),
+      // 每次新启动时强制默认缩放为 68%
+      zoom: { value: 0.68 as NormalizedZoomValue },
+    },
   };
 
   return { scene };
@@ -279,6 +287,24 @@ const ExcalidrawWrapper = () => {
     excalidrawAPI,
     adapter: SharedLibraryAdapter,
   });
+
+  // Manual reload of the shared library, triggered from the library panel's
+  // "Reload shared library" button. Re-fetches `/library.excalidrawlib` and
+  // replaces the in-memory library, so updates to the shared file are picked
+  // up without a full page refresh.
+  const onReloadLibrary = useCallback(() => {
+    if (!excalidrawAPI) {
+      return;
+    }
+    void fetchSharedLibraryItems().then((libraryItems) => {
+      excalidrawAPI.updateLibrary({
+        // replace (not merge) so the shared file is the single source of truth
+        libraryItems: libraryItems || [],
+        merge: false,
+        openLibraryMenu: true,
+      });
+    });
+  }, [excalidrawAPI]);
 
   // ---------------------------------------------------------------------------
   // Hoisted loadImages
@@ -577,6 +603,7 @@ const ExcalidrawWrapper = () => {
         onChange={onChange}
         onExport={onExport}
         initialData={initialStatePromiseRef.current.promise}
+        onReloadLibrary={onReloadLibrary}
         UIOptions={{
           canvasActions: {
             toggleTheme: true,

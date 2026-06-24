@@ -1,5 +1,5 @@
 import clsx from "clsx";
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Popover } from "radix-ui";
 
 import {
@@ -46,6 +46,11 @@ import {
 } from "../scene";
 
 import { getFormValue } from "../actions/actionProperties";
+import {
+  actionChangeStrokeColor,
+  actionChangeStrokeStyle,
+} from "../actions/actionProperties";
+import { actionDeleteSelected } from "../actions";
 
 import { useTextEditorFocus } from "../hooks/useTextEditorFocus";
 
@@ -59,6 +64,7 @@ import {
   useEditorInterface,
   useStylesPanelMode,
   useExcalidrawContainer,
+  useExcalidrawActionManager,
 } from "./App";
 import Stack from "./Stack";
 import { ToolButton } from "./ToolButton";
@@ -80,11 +86,19 @@ import {
   TextSizeIcon,
   adjustmentsIcon,
   DotsHorizontalIcon,
+  EraserIcon,
+  TrashIcon,
   SelectionIcon,
   pencilIcon,
   DiamondIcon,
+  RectangleIcon,
+  EllipseIcon,
+  TriangleShapeIcon,
+  ArrowIcon,
   TextIcon,
   ImageIcon,
+  LockedIcon,
+  UnlockedIcon,
 } from "./icons";
 
 import { Island } from "./Island";
@@ -191,40 +205,20 @@ export const SelectedShapeActions = ({
 
   return (
     <div className="selected-shape-actions">
+      {/* 常驻显示：描边色 + 描边宽度 + 描边样式（核心三项） */}
       <div>
         {canChangeStrokeColor(appState, targetElements) &&
           renderAction("changeStrokeColor")}
       </div>
-      {canChangeBackgroundColor(appState, targetElements) && (
-        <div>{renderAction("changeBackgroundColor")}</div>
-      )}
-      {showFillIcons && renderAction("changeFillStyle")}
 
       {(hasStrokeWidth(appState.activeTool.type) ||
         targetElements.some((element) => hasStrokeWidth(element.type))) &&
         renderAction("changeStrokeWidth")}
 
-      {(appState.activeTool.type === "freedraw" ||
-        targetElements.some((element) => element.type === "freedraw")) &&
-        renderAction("changeStrokeShape")}
-
+      {/* 边框样式（实线/虚线/点线）常驻 */}
       {(hasStrokeStyle(appState.activeTool.type) ||
-        targetElements.some((element) => hasStrokeStyle(element.type))) && (
-        <>
-          {renderAction("changeStrokeStyle")}
-          {renderAction("changeSloppiness")}
-        </>
-      )}
-
-      {(canChangeRoundness(appState.activeTool.type) ||
-        targetElements.some((element) => canChangeRoundness(element.type))) && (
-        <>{renderAction("changeRoundness")}</>
-      )}
-
-      {(toolIsArrow(appState.activeTool.type) ||
-        targetElements.some((element) => toolIsArrow(element.type))) && (
-        <>{renderAction("changeArrowType")}</>
-      )}
+        targetElements.some((element) => hasStrokeStyle(element.type))) &&
+        renderAction("changeStrokeStyle")}
 
       {(appState.activeTool.type === "text" ||
         targetElements.some(isTextElement)) && (
@@ -237,83 +231,109 @@ export const SelectedShapeActions = ({
         </>
       )}
 
-      {shouldAllowVerticalAlign(targetElements, elementsMap) &&
-        renderAction("changeVerticalAlign")}
       {(canHaveArrowheads(appState.activeTool.type) ||
         targetElements.some((element) => canHaveArrowheads(element.type))) && (
         <>{renderAction("changeArrowhead")}</>
       )}
 
-      {renderAction("changeOpacity")}
+      {/* 折叠区：线条风格 + 背景 + 边角 + 透明度 + 图层 + 对齐 + 动作（默认收起，点击展开）*/}
+      <details className="selected-shape-actions__more">
+        <summary>更多</summary>
 
-      <fieldset>
-        <legend>{t("labels.layers")}</legend>
-        <div className="buttonList">
-          {renderAction("sendToBack")}
-          {renderAction("sendBackward")}
-          {renderAction("bringForward")}
-          {renderAction("bringToFront")}
-        </div>
-      </fieldset>
+        {/* 粗糙度（手绘感）折叠 */}
+        {(hasStrokeStyle(appState.activeTool.type) ||
+          targetElements.some((element) => hasStrokeStyle(element.type))) &&
+          renderAction("changeSloppiness")}
 
-      {showAlignActions && !isSingleElementBoundContainer && (
+        {/* 背景色 + 填充 */}
+        {canChangeBackgroundColor(appState, targetElements) && (
+          <div>{renderAction("changeBackgroundColor")}</div>
+        )}
+        {showFillIcons && renderAction("changeFillStyle")}
+
+        {(canChangeRoundness(appState.activeTool.type) ||
+          targetElements.some((element) => canChangeRoundness(element.type))) && (
+          <>{renderAction("changeRoundness")}</>
+        )}
+
+        {(appState.activeTool.type === "freedraw" ||
+          targetElements.some((element) => element.type === "freedraw")) &&
+          renderAction("changeStrokeShape")}
+
+        {(toolIsArrow(appState.activeTool.type) ||
+          targetElements.some((element) => toolIsArrow(element.type))) && (
+          <>{renderAction("changeArrowType")}</>
+        )}
+
+        {shouldAllowVerticalAlign(targetElements, elementsMap) &&
+          renderAction("changeVerticalAlign")}
+
+        {renderAction("changeOpacity")}
+
         <fieldset>
-          <legend>{t("labels.align")}</legend>
+          <legend>{t("labels.layers")}</legend>
           <div className="buttonList">
-            {
-              // swap this order for RTL so the button positions always match their action
-              // (i.e. the leftmost button aligns left)
-            }
-            {isRTL ? (
-              <>
-                {renderAction("alignRight")}
-                {renderAction("alignHorizontallyCentered")}
-                {renderAction("alignLeft")}
-              </>
-            ) : (
-              <>
-                {renderAction("alignLeft")}
-                {renderAction("alignHorizontallyCentered")}
-                {renderAction("alignRight")}
-              </>
-            )}
-            {targetElements.length > 2 &&
-              renderAction("distributeHorizontally")}
-            {/* breaks the row ˇˇ */}
-            <div style={{ flexBasis: "100%", height: 0 }} />
-            <div
-              style={{
-                display: "flex",
-                flexWrap: "wrap",
-                gap: ".5rem",
-                marginTop: "-0.5rem",
-              }}
-            >
-              {renderAction("alignTop")}
-              {renderAction("alignVerticallyCentered")}
-              {renderAction("alignBottom")}
+            {/* 图层只留：下一层 + 上一层 */}
+            {renderAction("sendBackward")}
+            {renderAction("bringForward")}
+          </div>
+        </fieldset>
+
+        {showAlignActions && !isSingleElementBoundContainer && (
+          <fieldset>
+            <legend>{t("labels.align")}</legend>
+            <div className="buttonList">
+              {isRTL ? (
+                <>
+                  {renderAction("alignRight")}
+                  {renderAction("alignHorizontallyCentered")}
+                  {renderAction("alignLeft")}
+                </>
+              ) : (
+                <>
+                  {renderAction("alignLeft")}
+                  {renderAction("alignHorizontallyCentered")}
+                  {renderAction("alignRight")}
+                </>
+              )}
               {targetElements.length > 2 &&
-                renderAction("distributeVertically")}
+                renderAction("distributeHorizontally")}
+              {/* breaks the row ˇˇ */}
+              <div style={{ flexBasis: "100%", height: 0 }} />
+              <div
+                style={{
+                  display: "flex",
+                  flexWrap: "wrap",
+                  gap: ".5rem",
+                  marginTop: "-0.5rem",
+                }}
+              >
+                {renderAction("alignTop")}
+                {renderAction("alignVerticallyCentered")}
+                {renderAction("alignBottom")}
+                {targetElements.length > 2 &&
+                  renderAction("distributeVertically")}
+              </div>
             </div>
-          </div>
-        </fieldset>
-      )}
-      {!isEditingTextOrNewElement && targetElements.length > 0 && (
-        <fieldset>
-          <legend>{t("labels.actions")}</legend>
-          <div className="buttonList">
-            {editorInterface.formFactor !== "phone" &&
-              renderAction("duplicateSelection")}
-            {editorInterface.formFactor !== "phone" &&
-              renderAction("deleteSelectedElements")}
-            {renderAction("group")}
-            {renderAction("ungroup")}
-            {showLinkIcon && renderAction("hyperlink")}
-            {showCropEditorAction && renderAction("cropEditor")}
-            {showLineEditorAction && renderAction("toggleLinearEditor")}
-          </div>
-        </fieldset>
-      )}
+          </fieldset>
+        )}
+        {!isEditingTextOrNewElement && targetElements.length > 0 && (
+          <fieldset>
+            <legend>{t("labels.actions")}</legend>
+            <div className="buttonList">
+              {editorInterface.formFactor !== "phone" &&
+                renderAction("duplicateSelection")}
+              {editorInterface.formFactor !== "phone" &&
+                renderAction("deleteSelectedElements")}
+              {renderAction("group")}
+              {renderAction("ungroup")}
+              {showLinkIcon && renderAction("hyperlink")}
+              {showCropEditorAction && renderAction("cropEditor")}
+              {showLineEditorAction && renderAction("toggleLinearEditor")}
+            </div>
+          </fieldset>
+        )}
+      </details>
     </div>
   );
 };
@@ -1041,6 +1061,104 @@ export const MobileShapeActions = ({
   );
 };
 
+// 橡皮擦 + 删除 复合按钮（参照形状复合按钮 ToolPopover 的视觉风格）
+// - 主按钮：始终显示橡皮擦图标；橡皮擦工具激活时高亮
+// - 点击主按钮：仅展开/收起菜单，不改工具状态、不清除选中
+//   （注意：不能像形状按钮那样在点击时激活橡皮擦——setActiveTool 对非选择类工具
+//    会清空 selectedElementIds，会破坏后续「删除」的可用性）
+// - 菜单选项：橡皮擦（切换到橡皮擦工具）/ 删除（执行删除选中元素）
+// 不改变原有橡皮擦工具与删除动作的任何逻辑，仅做 UI 合并
+const EraserDeletePopover = ({
+  app,
+  activeTool,
+}: {
+  app: AppClassProperties;
+  activeTool: UIAppState["activeTool"];
+}) => {
+  const [isPopupOpen, setIsPopupOpen] = useState(false);
+  const actionManager = useExcalidrawActionManager();
+  const { container } = useExcalidrawContainer();
+  const SIDE_OFFSET = 32 / 2 + 10;
+
+  // 画布交互时收起菜单（与 ToolPopover 行为一致）
+  useEffect(() => {
+    const unsubscribe = app.onPointerDownEmitter?.on(() => {
+      setIsPopupOpen(false);
+    });
+    return () => unsubscribe?.();
+  }, [app]);
+
+  const eraserActive = activeTool.type === "eraser";
+
+  const deleteSelected = () => {
+    actionManager.executeAction(actionDeleteSelected, "ui");
+  };
+
+  const selectEraser = () => {
+    trackEvent("toolbar", "eraser", "ui");
+    app.setActiveTool({ type: "eraser" });
+  };
+
+  return (
+    <Popover.Root open={isPopupOpen}>
+      <Popover.Trigger asChild>
+        <ToolButton
+          className={clsx("Shape", { fillable: false })}
+          type="radio"
+          icon={EraserIcon}
+          checked={eraserActive}
+          name="editor-current-shape"
+          title={capitalizeString(t("toolBar.eraser"))}
+          aria-label={capitalizeString(t("toolBar.eraser"))}
+          data-testid="toolbar-eraser-delete"
+          onPointerDown={() => {
+            // 仅切换菜单：不调用 setActiveTool，保留当前选中，
+            // 确保「删除」选项始终基于真实选中状态生效
+            setIsPopupOpen((v) => !v);
+          }}
+        />
+      </Popover.Trigger>
+
+      <Popover.Content
+        className="tool-popover-content"
+        sideOffset={SIDE_OFFSET}
+        collisionBoundary={container ?? undefined}
+      >
+        <ToolButton
+          className={clsx("Shape", { active: eraserActive })}
+          type="radio"
+          icon={EraserIcon}
+          checked={eraserActive}
+          name="eraser-delete-option"
+          title={capitalizeString(t("toolBar.eraser"))}
+          keyBindingLabel=""
+          aria-label={capitalizeString(t("toolBar.eraser"))}
+          data-testid="toolbar-eraser"
+          onChange={() => {
+            selectEraser();
+            setIsPopupOpen(false);
+          }}
+        />
+        <ToolButton
+          className="Shape"
+          type="radio"
+          icon={TrashIcon}
+          checked={false}
+          name="eraser-delete-option"
+          title={capitalizeString(t("labels.delete"))}
+          keyBindingLabel=""
+          aria-label={capitalizeString(t("labels.delete"))}
+          data-testid="toolbar-delete"
+          onChange={() => {
+            deleteSelected();
+            setIsPopupOpen(false);
+          }}
+        />
+      </Popover.Content>
+    </Popover.Root>
+  );
+};
+
 export const ShapesSwitcher = ({
   activeTool,
   setAppState,
@@ -1056,6 +1174,7 @@ export const ShapesSwitcher = ({
   const stylesPanelMode = useStylesPanelMode();
   const isFullStylesPanel = stylesPanelMode === "full";
   const isCompactStylesPanel = stylesPanelMode === "compact";
+  const actionManager = useExcalidrawActionManager();
 
   const SELECTION_TOOLS = [
     {
@@ -1069,6 +1188,53 @@ export const ShapesSwitcher = ({
       title: capitalizeString(t("toolBar.lasso")),
     },
   ] as const;
+
+  // 形状复合按钮的选项
+  const SHAPE_TOOLS = [
+    {
+      type: "rectangle",
+      icon: RectangleIcon,
+      title: capitalizeString(t("toolBar.rectangle")),
+    },
+    {
+      type: "diamond",
+      icon: DiamondIcon,
+      title: capitalizeString(t("toolBar.diamond")),
+    },
+    {
+      type: "ellipse",
+      icon: EllipseIcon,
+      title: capitalizeString(t("toolBar.ellipse")),
+    },
+    {
+      type: "triangle",
+      icon: TriangleShapeIcon,
+      title: capitalizeString(t("toolBar.triangle")),
+    },
+    {
+      type: "arrow",
+      icon: ArrowIcon,
+      title: capitalizeString(t("toolBar.arrow")),
+    },
+  ] as const;
+
+  // 颜色循环：黑 → 红 → 绿 → 黑
+  const STROKE_COLOR_CYCLE = ["#1e1e1e", "#e03131", "#2f9e44"];
+  const currentStrokeColor = app.state.currentItemStrokeColor;
+  // 当前颜色在循环中的索引（用于决定下一个颜色）；不在列表中则从0开始
+  const colorIdx = STROKE_COLOR_CYCLE.indexOf(currentStrokeColor);
+  const nextColor =
+    STROKE_COLOR_CYCLE[(colorIdx + 1) % STROKE_COLOR_CYCLE.length];
+
+  // 描边样式：实线 ↔ 虚线 二态切换（dotted 归为非实线侧）
+  const STROKE_STYLE_CYCLE = ["solid", "dashed"] as const;
+  const currentStrokeStyle = app.state.currentItemStrokeStyle;
+  // 当前是否为实线（点线/虚线都视为非实线，统一切换为实线或虚线）
+  const isSolid = currentStrokeStyle === "solid";
+  const nextStrokeStyle: "solid" | "dashed" = isSolid ? "dashed" : "solid";
+  // 复合按钮显示当前选中的形状（如果当前是这4种之一）
+  const displayedShape =
+    SHAPE_TOOLS.find((s) => s.type === activeTool.type) || SHAPE_TOOLS[0];
 
   const frameToolSelected = activeTool.type === "frame";
   const laserToolSelected = activeTool.type === "laser";
@@ -1183,7 +1349,100 @@ export const ShapesSwitcher = ({
           );
         },
       )}
+
+      {/* 形状复合按钮：矩形/菱形/椭圆/三角形/箭头 */}
+      <ToolPopover
+        app={app}
+        options={SHAPE_TOOLS}
+        activeTool={activeTool}
+        defaultOption="rectangle"
+        namePrefix="shapeSwitcher"
+        title="形状"
+        data-testid="toolbar-shape-switcher"
+        onToolChange={(type: string) => {
+          app.setActiveTool({
+            type: type as
+              | "rectangle"
+              | "diamond"
+              | "ellipse"
+              | "triangle"
+              | "arrow",
+          });
+        }}
+        displayedOption={displayedShape}
+        fillable={
+          activeTool.type === "rectangle" ||
+          activeTool.type === "diamond" ||
+          activeTool.type === "ellipse" ||
+          activeTool.type === "triangle"
+        }
+      />
+
+      {/* 颜色循环按钮：点击切换描边色 黑→红→绿→黑 */}
+      <ToolButton
+        className="Shape"
+        type="button"
+        icon={
+          <div
+            style={{
+              width: 22,
+              height: 22,
+              borderRadius: "50%",
+              backgroundColor: currentStrokeColor,
+              border: "2px solid #fff",
+              boxShadow: "0 0 0 1px rgba(0,0,0,0.25)",
+            }}
+          />
+        }
+        title={`描边颜色：${currentStrokeColor}（点击切换为下一个）`}
+        aria-label="切换描边颜色"
+        data-testid="toolbar-stroke-color-cycle"
+        onClick={() => {
+          // 与原 APP 逻辑一致：通过 action 同时改选中元素颜色和新元素默认色
+          actionManager.executeAction(actionChangeStrokeColor, "ui", {
+            currentItemStrokeColor: nextColor,
+          });
+          trackEvent("toolbar", "strokeColorCycle", nextColor);
+        }}
+      />
+
+      {/* 描边样式按钮：实线 ↔ 虚线 二态切换 */}
+      <ToolButton
+        className="Shape"
+        type="button"
+        icon={
+          <svg width="28" height="22" viewBox="0 0 28 22">
+            <line
+              x1="3"
+              y1="11"
+              x2="25"
+              y2="11"
+              stroke="currentColor"
+              strokeWidth="2.5"
+              strokeLinecap="round"
+              strokeDasharray={isSolid ? "0" : "5 4"}
+            />
+          </svg>
+        }
+        title={`描边样式：${isSolid ? "实线" : "虚线"}（点击切换）`}
+        aria-label="切换描边样式"
+        data-testid="toolbar-stroke-style-cycle"
+        onClick={() => {
+          actionManager.executeAction(
+            actionChangeStrokeStyle,
+            "ui",
+            nextStrokeStyle,
+          );
+          trackEvent("toolbar", "strokeStyleCycle", nextStrokeStyle);
+        }}
+      />
+
+      <EraserDeletePopover app={app} activeTool={activeTool} />
+
       <div className="App-toolbar__divider" />
+
+      {/* 复制按钮：复制当前选中元素 */}
+      {actionManager.renderAction("duplicateSelection")}
 
       <DropdownMenu open={isExtraToolsMenuOpen}>
         <DropdownMenu.Trigger
@@ -1302,6 +1561,21 @@ export const ShapesSwitcher = ({
               {t("toolBar.magicframe")}
             </DropdownMenu.Item>
           )}
+          <DropdownMenu.Item
+            onSelect={() =>
+              setAppState((state) => ({
+                activeTool: {
+                  ...state.activeTool,
+                  locked: !state.activeTool.locked,
+                },
+              }))
+            }
+            icon={app.state.activeTool.locked ? LockedIcon : UnlockedIcon}
+            data-testid="toolbar-lock"
+            selected={app.state.activeTool.locked}
+          >
+            {t("toolBar.lock")}
+          </DropdownMenu.Item>
         </DropdownMenu.Content>
       </DropdownMenu>
     </>

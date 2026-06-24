@@ -40,7 +40,7 @@ export const SHAPES = [
     key: KEYS.R,
     numericKey: KEYS["2"],
     fillable: true,
-    toolbar: true,
+    toolbar: false,
   },
   {
     icon: DiamondIcon,
@@ -56,7 +56,7 @@ export const SHAPES = [
     key: KEYS.O,
     numericKey: KEYS["4"],
     fillable: true,
-    toolbar: true,
+    toolbar: false,
   },
   {
     icon: ArrowIcon,
@@ -64,7 +64,7 @@ export const SHAPES = [
     key: KEYS.A,
     numericKey: KEYS["5"],
     fillable: true,
-    toolbar: true,
+    toolbar: false,
   },
   {
     icon: LineIcon,
@@ -104,7 +104,9 @@ export const SHAPES = [
     key: KEYS.E,
     numericKey: KEYS["0"],
     fillable: false,
-    toolbar: true,
+    // 橡皮擦已与「删除」合并为工具栏复合按钮，不再作为独立工具按钮渲染
+    // 快捷键 E / 0 仍然有效（findShapeByKey 不依赖此字段）
+    toolbar: false,
   },
   {
     icon: laserPointerToolIcon,
