@@ -156,11 +156,9 @@ export const deriveStylesPanelMode = (
     return "mobile";
   }
 
-  if (editorInterface.formFactor === "tablet") {
-    return "compact";
-  }
-
-  return editorInterface.desktopUIMode;
+  // 桌面端（含 tablet）强制使用 compact 模式：
+  // 属性面板变成窄竖条，只占一个按钮宽度，不遮挡画布内容（课堂演示用）
+  return "compact";
 };
 
 export const createUserAgentDescriptor = (
