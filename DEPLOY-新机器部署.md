@@ -33,8 +33,12 @@ D:\Fire\
 D:\FireCloud\FireCloud.exe
 ```
 
-> exe 来源：从 `C:\Users\cdz\Desktop\FireCloudC\FireCloud.exe` 拷贝，
-> 或从 FireCloud 源码 `go build -o FireCloud.exe .` 编译。
+> exe 来源：从旧机器的 `FireCloud.exe` 拷贝，
+> 或从 FireCloud 源码编译：
+> ```
+> go build -ldflags "-H windowsgui" -o FireCloud.exe .
+> ```
+> 注意：`-ldflags "-H windowsgui"` 必须加，否则启动会弹出黑色控制台窗口。
 
 ### 第 3 步：拉取 Excalidraw 代码
 
