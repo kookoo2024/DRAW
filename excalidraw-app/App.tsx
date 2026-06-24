@@ -76,6 +76,9 @@ import {
   fetchSharedLibraryItems,
   getItemLibraryId,
   createLibrary,
+  deleteLibrary,
+  renameLibrary,
+  saveLibraryOrder,
 } from "./data/SharedLibraryAdapter";
 import { useLibraries } from "./data/useLibraries";
 
@@ -266,7 +269,7 @@ const ExcalidrawWrapper = () => {
   const [langCode, setLangCode] = useAppLangCode();
 
   // 多分类库：库清单 + 当前选中库
-  const { libraries, currentId, select, reload } = useLibraries();
+  const { libraries, currentId, select, reorder, reload } = useLibraries();
 
   // 新建库后刷新清单并切到新库
   const handleCreateLibrary = useCallback(
@@ -280,6 +283,35 @@ const ExcalidrawWrapper = () => {
     [reload],
   );
 
+  // 删除库后刷新清单，并切到第一个库
+  const handleDeleteLibrary = useCallback(
+    async (id: string) => {
+      const ok = await deleteLibrary(id);
+      if (ok) {
+        const libs = await reload();
+        // 切到剩余的第一个库
+        if (libs.length > 0) {
+          select(libs[0].id);
+        }
+      }
+      return ok;
+    },
+    [reload, select],
+  );
+
+  // 重命名库后刷新清单并切到新名
+  const handleRenameLibrary = useCallback(
+    async (oldId: string, newName: string) => {
+      const ok = await renameLibrary(oldId, newName);
+      if (ok) {
+        await reload();
+        select(newName);
+      }
+      return ok;
+    },
+    [reload, select],
+  );
+
   // 注入给 Excalidraw 的多库配置（让素材面板显示分类标签 + 按库过滤）
   // 必须 memoize：否则每次渲染都是新对象，会导致 LibraryMenuSection(memo)
   // 不断重挂载，渐进式渲染的 index 重置为 0，素材卡片永远不出现
@@ -290,8 +322,19 @@ const ExcalidrawWrapper = () => {
       onSelectLibrary: select,
       getItemLibraryId,
       onCreateLibrary: handleCreateLibrary,
+      onDeleteLibrary: handleDeleteLibrary,
+      onRenameLibrary: handleRenameLibrary,
+      onReorderLibrary: reorder,
     }),
-    [libraries, currentId, select, handleCreateLibrary],
+    [
+      libraries,
+      currentId,
+      select,
+      handleCreateLibrary,
+      handleDeleteLibrary,
+      handleRenameLibrary,
+      reorder,
+    ],
   );
 
   // initial state

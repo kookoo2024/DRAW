@@ -74,7 +74,7 @@ const itemLibraryMap = new Map<LibraryItem["id"], string>();
 /** 防止并发写：串行化保存请求 */
 let saveChain: Promise<void> = Promise.resolve();
 
-/** 列出服务器上所有库文件 */
+/** 列出服务器上所有库文件（按 index.json 的顺序，无则按拼音）*/
 export const listLibraries = async (): Promise<LibraryMeta[]> => {
   try {
     const res = await fetch(`/api/list?path=${LIBRARIES_DIR}`, {
@@ -85,18 +85,72 @@ export const listLibraries = async (): Promise<LibraryMeta[]> => {
     }
     const data = await res.json();
     const files: Array<{ name: string; isDir: boolean }> = data.files || [];
-    // 只取 .excalidrawlib 文件，按文件名排序
+    // 只取 .excalidrawlib 文件
     const libs = files
       .filter((f) => !f.isDir && f.name.endsWith(".excalidrawlib"))
       .map((f) => {
         const name = f.name.replace(/\.excalidrawlib$/i, "");
         return { id: name, name };
-      })
-      .sort((a, b) => a.name.localeCompare(b.name, "zh"));
-    return libs;
+      });
+
+    // 读 index.json 获取自定义顺序（服务器可能没有，catch 掉即可）
+    let order: string[] | null = null;
+    try {
+      const orderRes = await fetch(`/${LIBRARIES_DIR}/index.json`, {
+        cache: "no-cache",
+      });
+      if (orderRes.ok) {
+        const orderData = await orderRes.json();
+        if (Array.isArray(orderData.order)) {
+          order = orderData.order as string[];
+        }
+      }
+    } catch {
+      // index.json 不存在或解析失败，用默认顺序
+    }
+
+    if (order) {
+      // 按 index.json 排序：order 里的按顺序，不在 order 里的追加到末尾（按拼音）
+      const inOrder: LibraryMeta[] = [];
+      const rest: LibraryMeta[] = [];
+      for (const id of order) {
+        const found = libs.find((l) => l.id === id);
+        if (found) {
+          inOrder.push(found);
+        }
+      }
+      for (const lib of libs) {
+        if (!order.includes(lib.id)) {
+          rest.push(lib);
+        }
+      }
+      rest.sort((a, b) => a.name.localeCompare(b.name, "zh"));
+      return [...inOrder, ...rest];
+    }
+
+    // 无 index.json，按拼音排序
+    return libs.sort((a, b) => a.name.localeCompare(b.name, "zh"));
   } catch (error: any) {
     console.error(`[SharedLibraryAdapter] listLibraries failed: ${error?.message}`);
     return [];
+  }
+};
+
+/** 保存库的自定义顺序到服务器 index.json */
+export const saveLibraryOrder = async (
+  orderedIds: string[],
+): Promise<boolean> => {
+  try {
+    const payload = JSON.stringify({ order: orderedIds });
+    const path = encodeURIComponent(`${LIBRARIES_DIR}/index.json`);
+    const res = await fetch(`/api/upload?path=${path}`, {
+      method: "POST",
+      body: payload,
+    });
+    return res.ok;
+  } catch (error: any) {
+    console.error(`[SharedLibraryAdapter] saveLibraryOrder failed: ${error?.message}`);
+    return false;
   }
 };
 
@@ -138,6 +192,15 @@ const uploadLibraryFile = async (
   });
   if (!res.ok) {
     throw new Error(`upload ${libraryId} returned ${res.status}`);
+  }
+};
+
+/** 删除服务器上的某个库文件 */
+const deleteLibraryFile = async (libraryId: string): Promise<void> => {
+  const path = encodeURIComponent(`${LIBRARIES_DIR}/${libraryId}.excalidrawlib`);
+  const res = await fetch(`/api/delete?path=${path}`, { method: "POST" });
+  if (!res.ok) {
+    throw new Error(`delete ${libraryId} returned ${res.status}`);
   }
 };
 
@@ -260,6 +323,57 @@ export const createLibrary = async (name: string): Promise<boolean> => {
     return true;
   } catch (error: any) {
     console.error(`[SharedLibraryAdapter] createLibrary failed: ${error?.message}`);
+    return false;
+  }
+};
+
+/**
+ * 删除一个库（分类）。先从服务器删文件，再清理内存映射。
+ * 返回剩余库的清单，供 UI 刷新。
+ */
+export const deleteLibrary = async (
+  libraryId: string,
+): Promise<boolean> => {
+  try {
+    await deleteLibraryFile(libraryId);
+    // 清理该库的 item 映射
+    for (const [itemId, libId] of Array.from(itemLibraryMap.entries())) {
+      if (libId === libraryId) {
+        itemLibraryMap.delete(itemId);
+      }
+    }
+    return true;
+  } catch (error: any) {
+    console.error(`[SharedLibraryAdapter] deleteLibrary failed: ${error?.message}`);
+    return false;
+  }
+};
+
+/**
+ * 重命名一个库（分类）。
+ * 策略：拉取旧库内容 → 上传到新名 → 删除旧名 → 更新映射。
+ */
+export const renameLibrary = async (
+  oldId: string,
+  newName: string,
+): Promise<boolean> => {
+  const trimmed = newName.trim();
+  if (!trimmed || trimmed === oldId) {
+    return false;
+  }
+  try {
+    const items = await fetchLibraryFile(oldId);
+    await uploadLibraryFile(trimmed, (items as LibraryItems) || []);
+    await deleteLibraryFile(oldId);
+    // 更新映射：旧库的 item 归属改到新库
+    for (const [itemId, libId] of Array.from(itemLibraryMap.entries())) {
+      if (libId === oldId) {
+        itemLibraryMap.set(itemId, trimmed);
+      }
+    }
+    return true;
+  } catch (error: any) {
+    console.error(`[SharedLibraryAdapter] renameLibrary failed: ${error?.message}`);
     return false;
   }
 };

@@ -6,6 +6,7 @@ import {
   getCurrentLibraryId,
   setCurrentLibraryId,
   onCurrentLibraryChange,
+  saveLibraryOrder,
 } from "./SharedLibraryAdapter";
 
 /**
@@ -39,6 +40,33 @@ export const useLibraries = () => {
     setCurrentLibraryId(id);
   }, []);
 
+  // 拖拽重排：立即更新本地顺序，并保存到服务器 index.json
+  const reorder = useCallback(
+    (orderedIds: string[]) => {
+      // 本地立即重排，保证拖拽响应即时
+      setLibraries((prev) => {
+        const map = new Map(prev.map((l) => [l.id, l]));
+        const next: LibraryMeta[] = [];
+        for (const id of orderedIds) {
+          const lib = map.get(id);
+          if (lib) {
+            next.push(lib);
+          }
+        }
+        // 不在 orderedIds 里的（理论上不会）追加末尾
+        for (const lib of prev) {
+          if (!orderedIds.includes(lib.id)) {
+            next.push(lib);
+          }
+        }
+        return next;
+      });
+      // 保存到服务器（异步，失败只记日志，不打断拖拽）
+      void saveLibraryOrder(orderedIds);
+    },
+    [],
+  );
+
   // 订阅当前库变化（adapter 内部可能也会改 currentId，比如 load 时初始化）
   useEffect(() => {
     const unsub = onCurrentLibraryChange((id) => {
@@ -54,5 +82,5 @@ export const useLibraries = () => {
     void reload();
   }, [reload]);
 
-  return { libraries, currentId, select, reload };
+  return { libraries, currentId, select, reorder, reload };
 };

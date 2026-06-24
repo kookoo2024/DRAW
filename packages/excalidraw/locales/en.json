@@ -208,7 +208,10 @@
     },
     "newLibrary": "New library",
     "newLibraryPlaceholder": "Library name...",
-    "hint_emptyMultiLibrary": "This category is empty. Select an item on canvas to add it here."
+    "hint_emptyMultiLibrary": "This category is empty. Select an item on canvas to add it here.",
+    "rename": "Rename",
+    "delete": "Delete",
+    "deleteConfirm": "Delete category \"{name}\"? All items in it will be lost."
   },
   "search": {
     "title": "Find on canvas",

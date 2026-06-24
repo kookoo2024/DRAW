@@ -65,6 +65,9 @@ export default function LibraryMenuItems({
   onSelectLibrary,
   getItemLibraryId,
   onCreateLibrary,
+  onDeleteLibrary,
+  onRenameLibrary,
+  onReorderLibrary,
 }: {
   isLoading: boolean;
   libraryItems: LibraryItems;
@@ -80,6 +83,9 @@ export default function LibraryMenuItems({
   onSelectLibrary?: (id: string) => void;
   getItemLibraryId?: (itemId: LibraryItem["id"]) => string | null;
   onCreateLibrary?: (name: string) => Promise<boolean> | boolean;
+  onDeleteLibrary?: (id: string) => Promise<boolean> | boolean;
+  onRenameLibrary?: (oldId: string, newName: string) => Promise<boolean> | boolean;
+  onReorderLibrary?: (orderedIds: string[]) => void | Promise<boolean> | boolean;
 }) {
   const editorInterface = useEditorInterface();
   const libraryContainerRef = useRef<HTMLDivElement>(null);
@@ -429,6 +435,9 @@ export default function LibraryMenuItems({
           currentId={currentLibraryId ?? null}
           onSelect={onSelectLibrary}
           onCreate={onCreateLibrary}
+          onDelete={onDeleteLibrary}
+          onRename={onRenameLibrary}
+          onReorder={onReorderLibrary}
         />
       )}
       <div className="library-menu-items-header">

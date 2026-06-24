@@ -190,7 +190,10 @@
     },
     "newLibrary": "新建分类",
     "newLibraryPlaceholder": "输入分类名……",
-    "hint_emptyMultiLibrary": "这个分类还是空的。选中画布上的项目添加到此处。"
+    "hint_emptyMultiLibrary": "这个分类还是空的。选中画布上的项目添加到此处。",
+    "rename": "重命名",
+    "delete": "删除",
+    "deleteConfirm": "确定删除分类「{name}」吗？里面的素材会全部丢失。"
   },
   "search": {
     "title": "在画布上查找",
