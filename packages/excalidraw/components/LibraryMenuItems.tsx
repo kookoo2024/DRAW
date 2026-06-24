@@ -19,6 +19,7 @@ import { useScrollPosition } from "../hooks/useScrollPosition";
 import { t } from "../i18n";
 
 import { LibraryDropdownMenu } from "./LibraryMenuHeaderContent";
+import { LibraryTabs } from "./LibraryTabs";
 import {
   LibraryMenuSection,
   LibraryMenuSectionGrid,
@@ -58,6 +59,12 @@ export default function LibraryMenuItems({
   onSelectItems,
   selectedItems,
   onReloadLibrary,
+  // 多分类库支持（可选）：库清单 + 当前库 + 切换回调 + 归属查询
+  libraries,
+  currentLibraryId,
+  onSelectLibrary,
+  getItemLibraryId,
+  onCreateLibrary,
 }: {
   isLoading: boolean;
   libraryItems: LibraryItems;
@@ -67,6 +74,12 @@ export default function LibraryMenuItems({
   selectedItems: LibraryItem["id"][];
   onSelectItems: (id: LibraryItem["id"][]) => void;
   onReloadLibrary?: () => void;
+  // 多分类库相关（不传则退化为单库模式，兼容原行为）
+  libraries?: { id: string; name: string }[];
+  currentLibraryId?: string | null;
+  onSelectLibrary?: (id: string) => void;
+  getItemLibraryId?: (itemId: LibraryItem["id"]) => string | null;
+  onCreateLibrary?: (name: string) => Promise<boolean> | boolean;
 }) {
   const editorInterface = useEditorInterface();
   const libraryContainerRef = useRef<HTMLDivElement>(null);
@@ -86,32 +99,58 @@ export default function LibraryMenuItems({
 
   const [searchInputValue, setSearchInputValue] = useState("");
 
-  const IS_LIBRARY_EMPTY = !libraryItems.length && !pendingElements.length;
+  // 多库模式：是否启用（传入库清单且至少一个库）
+  const MULTI_LIBRARY = !!libraries && libraries.length > 0;
+
+  // 按当前选中库过滤的素材列表（多库模式下生效）
+  const itemsInCurrentLibrary = useMemo(() => {
+    if (!MULTI_LIBRARY || !currentLibraryId || !getItemLibraryId) {
+      return libraryItems;
+    }
+    const libCount = libraries?.length ?? 0;
+    return libraryItems.filter((item) => {
+      const mapped = getItemLibraryId(item.id);
+      if (mapped) {
+        return mapped === currentLibraryId;
+      }
+      // map 未命中时（时序/新库），单库场景归到当前库
+      return libCount <= 1;
+    });
+  }, [libraryItems, MULTI_LIBRARY, currentLibraryId, getItemLibraryId, libraries]);
+
+  const IS_LIBRARY_EMPTY =
+    !itemsInCurrentLibrary.length && !pendingElements.length;
 
   const IS_SEARCHING = !IS_LIBRARY_EMPTY && !!searchInputValue.trim();
 
+  // 搜索：在当前库范围内搜（多库模式）或全库搜（单库模式）
   const filteredItems = useMemo(() => {
     const searchQuery = deburr(searchInputValue.trim().toLowerCase());
     if (!searchQuery) {
       return [];
     }
 
-    return libraryItems.filter((item) => {
+    return itemsInCurrentLibrary.filter((item) => {
       const itemName = item.name || "";
       return (
         itemName.trim() && deburr(itemName.toLowerCase()).includes(searchQuery)
       );
     });
-  }, [libraryItems, searchInputValue]);
+  }, [itemsInCurrentLibrary, searchInputValue]);
 
+  // 多库模式下不再区分 published/unpublished，统一用当前库的素材
   const unpublishedItems = useMemo(
-    () => libraryItems.filter((item) => item.status !== "published"),
-    [libraryItems],
+    () =>
+      MULTI_LIBRARY ? [] : itemsInCurrentLibrary.filter((item) => item.status !== "published"),
+    [itemsInCurrentLibrary, MULTI_LIBRARY],
   );
 
   const publishedItems = useMemo(
-    () => libraryItems.filter((item) => item.status === "published"),
-    [libraryItems],
+    () =>
+      MULTI_LIBRARY
+        ? itemsInCurrentLibrary
+        : itemsInCurrentLibrary.filter((item) => item.status === "published"),
+    [itemsInCurrentLibrary, MULTI_LIBRARY],
   );
 
   const onItemSelectToggle = useCallback(
@@ -254,22 +293,26 @@ export default function LibraryMenuItems({
 
   const JSX_whenNotSearching = !IS_SEARCHING && (
     <>
-      {!IS_LIBRARY_EMPTY && (
+      {!IS_LIBRARY_EMPTY && !MULTI_LIBRARY && (
         <div className="library-menu-items-container__header">
           {t("labels.personalLib")}
         </div>
       )}
-      {!pendingElements.length && !unpublishedItems.length ? (
+      {!pendingElements.length &&
+      !unpublishedItems.length &&
+      !publishedItems.length ? (
         <div className="library-menu-items__no-items">
-          {!publishedItems.length && (
+          {!publishedItems.length && !MULTI_LIBRARY && (
             <div className="library-menu-items__no-items__label">
               {t("library.noItems")}
             </div>
           )}
           <div className="library-menu-items__no-items__hint">
-            {publishedItems.length > 0
-              ? t("library.hint_emptyPrivateLibrary")
-              : t("library.hint_emptyLibrary")}
+            {MULTI_LIBRARY
+              ? t("library.hint_emptyMultiLibrary")
+              : publishedItems.length > 0
+                ? t("library.hint_emptyPrivateLibrary")
+                : t("library.hint_emptyLibrary")}
           </div>
         </div>
       ) : (
@@ -297,7 +340,7 @@ export default function LibraryMenuItems({
         </LibraryMenuSectionGrid>
       )}
 
-      {publishedItems.length > 0 && (
+      {publishedItems.length > 0 && !MULTI_LIBRARY && (
         <div
           className="library-menu-items-container__header"
           style={{ marginTop: "0.75rem" }}
@@ -380,6 +423,14 @@ export default function LibraryMenuItems({
           : { borderBottom: 0 }
       }
     >
+      {MULTI_LIBRARY && libraries && onSelectLibrary && (
+        <LibraryTabs
+          libraries={libraries}
+          currentId={currentLibraryId ?? null}
+          onSelect={onSelectLibrary}
+          onCreate={onCreateLibrary}
+        />
+      )}
       <div className="library-menu-items-header">
         {!IS_LIBRARY_EMPTY && (
           <TextField

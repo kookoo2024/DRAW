@@ -49,7 +49,7 @@
     "start": "yarn && vite",
     "start:production": "yarn build && yarn serve",
     "serve": "npx http-server build -a 0.0.0.0 -p 8080 -c-1 --cors",
-    "build:local": "cross-env VITE_APP_DISABLE_SENTRY=true vite build",
+    "build:local": "cross-env VITE_APP_DISABLE_SENTRY=true VITE_APP_DISABLE_PWA=true vite build",
     "build:preview": "yarn build && vite preview --port 5000"
   },
   "devDependencies": {

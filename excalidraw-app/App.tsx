@@ -17,7 +17,7 @@ import {
   resolvablePromise,
 } from "@excalidraw/common";
 import polyfill from "@excalidraw/excalidraw/polyfill";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { t } from "@excalidraw/excalidraw/i18n";
 
 import {
@@ -69,11 +69,15 @@ import { useHandleAppTheme } from "./useHandleAppTheme";
 import { getPreferredLanguage } from "./app-language/language-detector";
 import { useAppLangCode } from "./app-language/language-state";
 
-// shared, read-only library adapter — loads /library.excalidrawlib from public/
+// 多素材库 adapter —— 从 /libraries/*.excalidrawlib 加载所有分类库，
+// 并在增删素材时 POST 回写到对应库文件（浏览器直存服务器）。
 import {
   SharedLibraryAdapter,
   fetchSharedLibraryItems,
+  getItemLibraryId,
+  createLibrary,
 } from "./data/SharedLibraryAdapter";
+import { useLibraries } from "./data/useLibraries";
 
 import { useAtomValue } from "./app-jotai";
 import { AppFooter } from "./components/AppFooter";
@@ -261,6 +265,35 @@ const ExcalidrawWrapper = () => {
 
   const [langCode, setLangCode] = useAppLangCode();
 
+  // 多分类库：库清单 + 当前选中库
+  const { libraries, currentId, select, reload } = useLibraries();
+
+  // 新建库后刷新清单并切到新库
+  const handleCreateLibrary = useCallback(
+    async (name: string) => {
+      const ok = await createLibrary(name);
+      if (ok) {
+        await reload();
+      }
+      return ok;
+    },
+    [reload],
+  );
+
+  // 注入给 Excalidraw 的多库配置（让素材面板显示分类标签 + 按库过滤）
+  // 必须 memoize：否则每次渲染都是新对象，会导致 LibraryMenuSection(memo)
+  // 不断重挂载，渐进式渲染的 index 重置为 0，素材卡片永远不出现
+  const libraryConfig = useMemo(
+    () => ({
+      libraries,
+      currentLibraryId: currentId,
+      onSelectLibrary: select,
+      getItemLibraryId,
+      onCreateLibrary: handleCreateLibrary,
+    }),
+    [libraries, currentId, select, handleCreateLibrary],
+  );
+
   // initial state
   // ---------------------------------------------------------------------------
 
@@ -280,25 +313,22 @@ const ExcalidrawWrapper = () => {
     }, VERSION_TIMEOUT);
   }, []);
 
-  // shared read-only library — load /library.excalidrawlib on startup.
-  // `save` is a no-op in the adapter so per-browser edits are not persisted
-  // back; the shared file is the single source of truth across all LAN clients.
+  // 多素材库 + 浏览器直存：adapter 从 /libraries/*.excalidrawlib 加载所有库，
+  // 并在增删素材时 POST 回写到对应库文件（save 不再是 no-op）。
   useHandleLibrary({
     excalidrawAPI,
     adapter: SharedLibraryAdapter,
   });
 
-  // Manual reload of the shared library, triggered from the library panel's
-  // "Reload shared library" button. Re-fetches `/library.excalidrawlib` and
-  // replaces the in-memory library, so updates to the shared file are picked
-  // up without a full page refresh.
+  // 手动重载所有素材库（面板里"重新加载"按钮触发）。
+  // 重新拉取所有库文件并替换内存数据，让服务器的更新立即生效。
   const onReloadLibrary = useCallback(() => {
     if (!excalidrawAPI) {
       return;
     }
     void fetchSharedLibraryItems().then((libraryItems) => {
       excalidrawAPI.updateLibrary({
-        // replace (not merge) so the shared file is the single source of truth
+        // replace（非 merge），以服务器文件为唯一真相源
         libraryItems: libraryItems || [],
         merge: false,
         openLibraryMenu: true,
@@ -604,6 +634,7 @@ const ExcalidrawWrapper = () => {
         onExport={onExport}
         initialData={initialStatePromiseRef.current.promise}
         onReloadLibrary={onReloadLibrary}
+        libraryConfig={libraryConfig}
         UIOptions={{
           canvasActions: {
             toggleTheme: true,

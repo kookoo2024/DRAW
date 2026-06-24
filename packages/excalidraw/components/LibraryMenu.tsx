@@ -50,6 +50,7 @@ import type {
   LibraryItem,
   UIAppState,
   AppClassProperties,
+  ExcalidrawProps,
 } from "../types";
 import type Library from "../data/library";
 
@@ -69,6 +70,7 @@ const LibraryMenuContent = memo(
     library,
     selectedItems,
     onSelectItems,
+    libraryConfig,
   }: {
     pendingElements: LibraryItem["elements"];
     onInsertLibraryItems: (libraryItems: LibraryItems) => void;
@@ -78,6 +80,7 @@ const LibraryMenuContent = memo(
     library: Library;
     selectedItems: LibraryItem["id"][];
     onSelectItems: (id: LibraryItem["id"][]) => void;
+    libraryConfig?: ExcalidrawProps["libraryConfig"];
   }) => {
     const [libraryItemsData] = useAtom(libraryItemsAtom);
 
@@ -97,7 +100,8 @@ const LibraryMenuContent = memo(
           }
           const nextItems: LibraryItems = [
             {
-              status: "unpublished",
+              // 多库模式下统一用 published，归属由 itemLibraryMap 跟踪
+              status: "published",
               elements: processedElements,
               id: randomId(),
               created: Date.now(),
@@ -146,6 +150,11 @@ const LibraryMenuContent = memo(
           onReloadLibrary={onReloadLibrary}
           onSelectItems={onSelectItems}
           selectedItems={selectedItems}
+          libraries={libraryConfig?.libraries}
+          currentLibraryId={libraryConfig?.currentLibraryId ?? null}
+          onSelectLibrary={libraryConfig?.onSelectLibrary}
+          getItemLibraryId={libraryConfig?.getItemLibraryId}
+          onCreateLibrary={libraryConfig?.onCreateLibrary}
         />
       </LibraryMenuWrapper>
     );
@@ -317,6 +326,7 @@ export const LibraryMenu = memo(() => {
       library={memoizedLibrary}
       selectedItems={selectedItems}
       onSelectItems={setSelectedItems}
+      libraryConfig={appProps.libraryConfig}
     />
   );
 });

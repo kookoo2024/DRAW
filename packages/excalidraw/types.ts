@@ -663,6 +663,18 @@ export interface ExcalidrawProps {
   detectScroll?: boolean;
   handleKeyboardGlobally?: boolean;
   onLibraryChange?: (libraryItems: LibraryItems) => void | Promise<any>;
+  /**
+   * 多分类库配置（可选）。提供后素材面板会显示分类切换标签，
+   * 并按当前选中库过滤素材；不提供则退化为单库模式。
+   * 由宿主 app 注入（例如从服务器加载多个 .excalidrawlib 文件）。
+   */
+  libraryConfig?: {
+    libraries: { id: string; name: string }[];
+    currentLibraryId: string | null;
+    onSelectLibrary: (id: string) => void;
+    getItemLibraryId: (itemId: LibraryItem["id"]) => string | null;
+    onCreateLibrary?: (name: string) => Promise<boolean> | boolean;
+  };
   autoFocus?: boolean;
   generateIdForFile?: (file: File) => string | Promise<string>;
   generateLinkForSelection?: (id: string, type: "element" | "group") => string;

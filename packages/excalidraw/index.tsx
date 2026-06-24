@@ -105,6 +105,8 @@ const ExcalidrawBase = (props: ExcalidrawProps) => {
     showDeprecatedFonts,
     renderScrollbars,
     imageOptions,
+    onReloadLibrary,
+    libraryConfig,
   } = props;
 
   const canvasActions = props.UIOptions?.canvasActions;
@@ -224,6 +226,8 @@ const ExcalidrawBase = (props: ExcalidrawProps) => {
           showDeprecatedFonts={showDeprecatedFonts}
           renderScrollbars={renderScrollbars}
           imageOptions={normalizedImageOptions}
+          onReloadLibrary={onReloadLibrary}
+          libraryConfig={libraryConfig}
         >
           {children}
         </App>

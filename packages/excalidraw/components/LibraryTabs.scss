@@ -1,0 +1,96 @@
+.library-tabs {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 6px 8px;
+  border-bottom: 1px solid var(--sidebar-border-color, #e9ecef);
+  background: var(--island-bg-color, transparent);
+  overflow-x: auto;
+  flex-shrink: 0;
+
+  &__list {
+    display: flex;
+    gap: 4px;
+    overflow-x: auto;
+    flex: 1;
+    scrollbar-width: thin;
+
+    &::-webkit-scrollbar {
+      height: 3px;
+    }
+    &::-webkit-scrollbar-thumb {
+      background: var(--default-border-color, #e0e0e0);
+      border-radius: 2px;
+    }
+  }
+
+  &__tab {
+    appearance: none;
+    border: none;
+    background: transparent;
+    color: var(--text-color-primary, #1b1b1f);
+    font-size: 12px;
+    line-height: 1;
+    padding: 6px 10px;
+    border-radius: 6px;
+    white-space: nowrap;
+    cursor: pointer;
+    transition: background-color 0.1s;
+    opacity: 0.65;
+
+    &:hover {
+      background: var(--button-hover-bg, rgba(0, 0, 0, 0.05));
+      opacity: 1;
+    }
+
+    &--active {
+      background: var(--color-primary, #6965db);
+      color: #fff;
+      opacity: 1;
+
+      &:hover {
+        background: var(--color-primary-darker, #5b57d1);
+        color: #fff;
+      }
+    }
+  }
+
+  &__add {
+    appearance: none;
+    border: 1px dashed var(--default-border-color, #d4d4d8);
+    background: transparent;
+    color: var(--text-color-primary, #1b1b1f);
+    font-size: 14px;
+    line-height: 1;
+    width: 24px;
+    height: 24px;
+    border-radius: 6px;
+    cursor: pointer;
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    opacity: 0.6;
+
+    &:hover {
+      opacity: 1;
+      border-color: var(--color-primary, #6965db);
+      color: var(--color-primary, #6965db);
+    }
+  }
+
+  &__input {
+    font-size: 12px;
+    padding: 4px 8px;
+    border: 1px solid var(--color-primary, #6965db);
+    border-radius: 6px;
+    background: var(--island-bg-color, #fff);
+    color: var(--text-color-primary, #1b1b1f);
+    width: 96px;
+    flex-shrink: 0;
+
+    &:focus {
+      outline: none;
+    }
+  }
+}

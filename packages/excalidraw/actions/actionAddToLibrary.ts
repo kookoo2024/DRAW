@@ -35,7 +35,8 @@ export const actionAddToLibrary = register({
         return app.library.setLibrary([
           {
             id: randomId(),
-            status: "unpublished",
+            // 多库模式下统一用 published，否则按库过滤时不显示
+            status: "published",
             elements: selectedElements.map(deepCopyElement),
             created: Date.now(),
           },

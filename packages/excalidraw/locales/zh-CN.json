@@ -187,7 +187,10 @@
       "heading": "匹配的库",
       "noResults": "无匹配项……",
       "clearSearch": "清除搜索"
-    }
+    },
+    "newLibrary": "新建分类",
+    "newLibraryPlaceholder": "输入分类名……",
+    "hint_emptyMultiLibrary": "这个分类还是空的。选中画布上的项目添加到此处。"
   },
   "search": {
     "title": "在画布上查找",

@@ -1,0 +1,58 @@
+import { useCallback, useEffect, useState } from "react";
+
+import {
+  type LibraryMeta,
+  listLibraries,
+  getCurrentLibraryId,
+  setCurrentLibraryId,
+  onCurrentLibraryChange,
+} from "./SharedLibraryAdapter";
+
+/**
+ * 管理素材库清单 + 当前选中库的 React hook。
+ *
+ * - 加载时从服务器拉取所有库（分类）的清单
+ * - 暴露 currentId（当前选中的库）、libraries（清单）、select（切换）
+ * - select 切换后，SharedLibraryAdapter 内部状态同步更新，
+ *   LibraryMenuItems 通过 getItemLibraryId 按库过滤素材
+ */
+export const useLibraries = () => {
+  const [libraries, setLibraries] = useState<LibraryMeta[]>([]);
+  const [currentId, setCurrentId] = useState<string | null>(
+    getCurrentLibraryId(),
+  );
+
+  // 拉取库清单
+  const reload = useCallback(async () => {
+    const libs = await listLibraries();
+    setLibraries(libs);
+    const current = getCurrentLibraryId();
+    // 若当前库为空，或已不存在于清单（被删），回退到第一个
+    if ((!current || !libs.some((l) => l.id === current)) && libs.length > 0) {
+      setCurrentLibraryId(libs[0].id);
+    }
+    return libs;
+  }, []);
+
+  // 切换当前库
+  const select = useCallback((id: string) => {
+    setCurrentLibraryId(id);
+  }, []);
+
+  // 订阅当前库变化（adapter 内部可能也会改 currentId，比如 load 时初始化）
+  useEffect(() => {
+    const unsub = onCurrentLibraryChange((id) => {
+      setCurrentId(id);
+    });
+    return () => {
+      unsub();
+    };
+  }, []);
+
+  // 初始加载
+  useEffect(() => {
+    void reload();
+  }, [reload]);
+
+  return { libraries, currentId, select, reload };
+};
