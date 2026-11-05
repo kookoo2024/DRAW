@@ -20,6 +20,7 @@ export const LibraryTabs = ({
   onDelete,
   onRename,
   onReorder,
+  actions,
 }: {
   libraries: { id: string; name: string }[];
   currentId: string | null;
@@ -28,6 +29,7 @@ export const LibraryTabs = ({
   onDelete?: (id: string) => Promise<boolean> | boolean;
   onRename?: (oldId: string, newName: string) => Promise<boolean> | boolean;
   onReorder?: (orderedIds: string[]) => void | Promise<boolean> | boolean;
+  actions?: React.ReactNode;
 }) => {
   const [creating, setCreating] = useState(false);
   const [newName, setNewName] = useState("");
@@ -298,6 +300,7 @@ export const LibraryTabs = ({
           +
         </button>
       )}
+      {actions && <div className="library-menu-header-actions">{actions}</div>}
       {creating && (
         <input
           autoFocus

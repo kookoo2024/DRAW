@@ -6,13 +6,9 @@ import React, {
   useState,
 } from "react";
 
-import { MIME_TYPES, arrayToMap, nextAnimationFrame } from "@excalidraw/common";
+import { MIME_TYPES, arrayToMap } from "@excalidraw/common";
 
 import { duplicateElements } from "@excalidraw/element";
-
-import clsx from "clsx";
-
-import { deburr } from "../deburr";
 
 import { useLibraryCache } from "../hooks/useLibraryItemSvg";
 import { useScrollPosition } from "../hooks/useScrollPosition";
@@ -30,11 +26,7 @@ import Stack from "./Stack";
 
 import "./LibraryMenuItems.scss";
 
-import { TextField } from "./TextField";
-
-import { useEditorInterface } from "./App";
-
-import { Button } from "./Button";
+import { GalleryIcon } from "./icons";
 
 import type { ExcalidrawLibraryIds } from "../data/types";
 
@@ -91,7 +83,6 @@ export default function LibraryMenuItems({
   ) => void | Promise<boolean> | boolean;
   onOpenGallery?: () => void;
 }) {
-  const editorInterface = useEditorInterface();
   const libraryContainerRef = useRef<HTMLDivElement>(null);
   const scrollPosition = useScrollPosition<HTMLDivElement>(libraryContainerRef);
 
@@ -106,8 +97,6 @@ export default function LibraryMenuItems({
   const [lastSelectedItem, setLastSelectedItem] = useState<
     LibraryItem["id"] | null
   >(null);
-
-  const [searchInputValue, setSearchInputValue] = useState("");
 
   // 多库模式：是否启用（传入库清单且至少一个库）
   const MULTI_LIBRARY = !!libraries && libraries.length > 0;
@@ -136,23 +125,6 @@ export default function LibraryMenuItems({
 
   const IS_LIBRARY_EMPTY =
     !itemsInCurrentLibrary.length && !pendingElements.length;
-
-  const IS_SEARCHING = !IS_LIBRARY_EMPTY && !!searchInputValue.trim();
-
-  // 搜索：在当前库范围内搜（多库模式）或全库搜（单库模式）
-  const filteredItems = useMemo(() => {
-    const searchQuery = deburr(searchInputValue.trim().toLowerCase());
-    if (!searchQuery) {
-      return [];
-    }
-
-    return itemsInCurrentLibrary.filter((item) => {
-      const itemName = item.name || "";
-      return (
-        itemName.trim() && deburr(itemName.toLowerCase()).includes(searchQuery)
-      );
-    });
-  }, [itemsInCurrentLibrary, searchInputValue]);
 
   // 多库模式下不再区分 published/unpublished，统一用当前库的素材
   const unpublishedItems = useMemo(
@@ -296,20 +268,11 @@ export default function LibraryMenuItems({
   );
 
   const itemsRenderedPerBatch =
-    svgCache.size >=
-    (filteredItems.length ? filteredItems : libraryItems).length
+    svgCache.size >= itemsInCurrentLibrary.length
       ? CACHED_ITEMS_RENDERED_PER_BATCH
       : ITEMS_RENDERED_PER_BATCH;
 
-  const searchInputRef = useRef<HTMLInputElement>(null);
-  useEffect(() => {
-    // focus could be stolen by tab trigger button
-    nextAnimationFrame(() => {
-      searchInputRef.current?.focus();
-    });
-  }, []);
-
-  const JSX_whenNotSearching = !IS_SEARCHING && (
+  const libraryItemsJSX = (
     <>
       {!IS_LIBRARY_EMPTY && !MULTI_LIBRARY && (
         <div className="library-menu-items-container__header">
@@ -382,50 +345,23 @@ export default function LibraryMenuItems({
     </>
   );
 
-  const JSX_whenSearching = IS_SEARCHING && (
+  const libraryActions = (
     <>
-      <div className="library-menu-items-container__header">
-        {t("library.search.heading")}
-        {!isLoading && (
-          <div
-            className="library-menu-items-container__header__hint"
-            style={{ cursor: "pointer" }}
-            onPointerDown={(e) => e.preventDefault()}
-            onClick={(event) => {
-              setSearchInputValue("");
-            }}
-          >
-            <kbd>esc</kbd> to clear
-          </div>
-        )}
-      </div>
-      {filteredItems.length > 0 ? (
-        <LibraryMenuSectionGrid>
-          <LibraryMenuSection
-            itemsRenderedPerBatch={itemsRenderedPerBatch}
-            items={filteredItems}
-            onItemSelectToggle={onItemSelectToggle}
-            onItemDrag={onItemDrag}
-            onClick={onItemClick}
-            isItemSelected={isItemSelected}
-            svgCache={svgCache}
-          />
-        </LibraryMenuSectionGrid>
-      ) : (
-        <div className="library-menu-items__no-items">
-          <div className="library-menu-items__no-items__hint">
-            {t("library.search.noResults")}
-          </div>
-          <Button
-            onPointerDown={(e) => e.preventDefault()}
-            onSelect={() => {
-              setSearchInputValue("");
-            }}
-            style={{ width: "auto", marginTop: "1rem" }}
-          >
-            {t("library.search.clearSearch")}
-          </Button>
-        </div>
+      <LibraryDropdownMenu
+        selectedItems={selectedItems}
+        onSelectItems={onSelectItems}
+        onReloadLibrary={onReloadLibrary}
+      />
+      {onOpenGallery && (
+        <button
+          type="button"
+          className="library-menu-gallery-button"
+          onClick={onOpenGallery}
+          title={t("library.openGallery") as string}
+          aria-label={t("library.openGallery") as string}
+        >
+          {GalleryIcon}
+        </button>
       )}
     </>
   );
@@ -441,7 +377,7 @@ export default function LibraryMenuItems({
           : { borderBottom: 0 }
       }
     >
-      {MULTI_LIBRARY && libraries && onSelectLibrary && (
+      {MULTI_LIBRARY && libraries && onSelectLibrary ? (
         <LibraryTabs
           libraries={libraries}
           currentId={currentLibraryId ?? null}
@@ -450,38 +386,11 @@ export default function LibraryMenuItems({
           onDelete={onDeleteLibrary}
           onRename={onRenameLibrary}
           onReorder={onReorderLibrary}
+          actions={libraryActions}
         />
+      ) : (
+        <div className="library-menu-items-header">{libraryActions}</div>
       )}
-      <div className="library-menu-items-header">
-        {!IS_LIBRARY_EMPTY && (
-          <TextField
-            ref={searchInputRef}
-            type="search"
-            className={clsx("library-menu-items-container__search", {
-              hideCancelButton: editorInterface.formFactor !== "phone",
-            })}
-            placeholder={t("library.search.inputPlaceholder")}
-            value={searchInputValue}
-            onChange={(value) => setSearchInputValue(value)}
-          />
-        )}
-        <LibraryDropdownMenu
-          selectedItems={selectedItems}
-          onSelectItems={onSelectItems}
-          onReloadLibrary={onReloadLibrary}
-          className="library-menu-dropdown-container--in-heading"
-        />
-        {onOpenGallery && (
-          <button
-            type="button"
-            className="library-menu-gallery-button"
-            onClick={onOpenGallery}
-            title={t("library.openGallery") as string}
-          >
-            {t("library.openGallery") as string}
-          </button>
-        )}
-      </div>
       <Stack.Col
         className="library-menu-items-container__items"
         align="start"
@@ -505,8 +414,7 @@ export default function LibraryMenuItems({
           </div>
         )}
 
-        {JSX_whenNotSearching}
-        {JSX_whenSearching}
+        {libraryItemsJSX}
       </Stack.Col>
     </div>
   );
