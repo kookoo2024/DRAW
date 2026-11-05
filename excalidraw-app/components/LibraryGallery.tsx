@@ -31,35 +31,81 @@ import "./LibraryGallery.scss";
 
 import type {
   GalleryLibraryCatalog,
-  GalleryLibraryCategory,
   GalleryLibraryItem,
 } from "../data/libraryCatalog";
 
 const RECENT_ITEMS_KEY = "excalidraw-library-gallery:recent";
+const FAVORITE_ITEMS_KEY = "excalidraw-library-gallery:favorites";
 const CONTINUOUS_INSERT_KEY = "excalidraw-library-gallery:continuous";
+const LAST_VIEW_KEY = "excalidraw-library-gallery:view";
 const MAX_RECENT_ITEMS = 12;
 
-const readRecentItems = (): string[] => {
+type GalleryView =
+  | { type: "all" }
+  | { type: "recent" }
+  | { type: "favorites" }
+  | { type: "category"; id: string };
+
+const readStringArray = (key: string, max?: number): string[] => {
   try {
-    const parsed = JSON.parse(localStorage.getItem(RECENT_ITEMS_KEY) || "[]");
+    const parsed = JSON.parse(localStorage.getItem(key) || "[]");
     if (!Array.isArray(parsed)) {
       return [];
     }
-    return parsed
-      .filter((value): value is string => typeof value === "string")
-      .slice(0, MAX_RECENT_ITEMS);
+    const values = parsed.filter(
+      (value): value is string => typeof value === "string",
+    );
+    return max ? values.slice(0, max) : values;
   } catch {
     return [];
   }
 };
 
-const readContinuousInsert = () => {
+const writeStringArray = (key: string, values: string[]) => {
   try {
-    return localStorage.getItem(CONTINUOUS_INSERT_KEY) === "true";
+    localStorage.setItem(key, JSON.stringify(values));
   } catch {
-    return false;
+    // localStorage may be unavailable.
   }
 };
+
+const readRecentItems = () =>
+  readStringArray(RECENT_ITEMS_KEY, MAX_RECENT_ITEMS);
+const readFavoriteItems = () => readStringArray(FAVORITE_ITEMS_KEY);
+
+const readContinuousInsert = () => {
+  try {
+    const stored = localStorage.getItem(CONTINUOUS_INSERT_KEY);
+    // 课堂场景默认保持面板打开，方便连续插入多个素材。
+    return stored === null ? true : stored === "true";
+  } catch {
+    return true;
+  }
+};
+
+const readSavedView = (): GalleryView => {
+  try {
+    const raw = localStorage.getItem(LAST_VIEW_KEY);
+    if (raw === "recent") {
+      return { type: "recent" };
+    }
+    if (raw === "favorites") {
+      return { type: "favorites" };
+    }
+    if (raw?.startsWith("category:")) {
+      const id = raw.slice("category:".length);
+      if (id) {
+        return { type: "category", id };
+      }
+    }
+  } catch {
+    // localStorage may be unavailable.
+  }
+  return { type: "all" };
+};
+
+const serializeView = (view: GalleryView) =>
+  view.type === "category" ? `category:${view.id}` : view.type;
 
 const LibraryPreview = ({
   item,
@@ -91,87 +137,94 @@ const LibraryPreview = ({
   );
 };
 
-const CategoryCard = ({
-  category,
-  onOpen,
-}: {
-  category: GalleryLibraryCategory;
-  onOpen: (id: string) => void;
-}) => {
-  const previewItems = category.items.slice(0, 4);
-
-  return (
-    <button
-      type="button"
-      className="library-gallery__category-card"
-      onClick={() => onOpen(category.id)}
-    >
-      <div
-        className={clsx("library-gallery__category-cover", {
-          "library-gallery__category-cover--single": previewItems.length === 1,
-        })}
-      >
-        {previewItems.map((item) => (
-          <LibraryPreview
-            key={item.id}
-            item={item}
-            className="library-gallery__category-preview"
-          />
-        ))}
-      </div>
-      <div className="library-gallery__category-meta">
-        <span className="library-gallery__category-name">{category.name}</span>
-        <span className="library-gallery__category-count">
-          {t("library.galleryItems", { count: category.items.length })}
-        </span>
-      </div>
-    </button>
-  );
-};
-
 const ItemCard = ({
   item,
   busy,
   disabled,
+  favorite,
   onInsert,
+  onToggleFavorite,
+  onPreview,
 }: {
   item: GalleryLibraryItem;
   busy: boolean;
   disabled: boolean;
+  favorite: boolean;
   onInsert: (item: GalleryLibraryItem) => void;
+  onToggleFavorite: (item: GalleryLibraryItem) => void;
+  onPreview: (item: GalleryLibraryItem) => void;
 }) => {
+  const favoriteLabel = favorite
+    ? t("library.galleryUnfavorite")
+    : t("library.galleryFavorite");
+
   return (
-    <button
-      type="button"
+    <div
       className={clsx("library-gallery__item-card", {
         "is-busy": busy,
       })}
-      disabled={disabled}
-      onClick={() => onInsert(item)}
-      title={`${item.category} / ${item.name}`}
     >
-      <div className="library-gallery__item-preview">
-        <LibraryPreview item={item} className="library-gallery__item-image" />
+      <button
+        type="button"
+        className="library-gallery__item-main"
+        disabled={disabled}
+        onClick={() => onInsert(item)}
+        title={`${item.category} / ${item.name}`}
+      >
+        <div className="library-gallery__item-preview">
+          <LibraryPreview item={item} className="library-gallery__item-image" />
+        </div>
+        <div className="library-gallery__item-meta">
+          <span className="library-gallery__item-name">{item.name}</span>
+          <span className="library-gallery__item-category">
+            {item.category}
+          </span>
+        </div>
+        <span className="library-gallery__item-insert">
+          {busy ? t("library.galleryInserting") : t("library.galleryInsert")}
+        </span>
+      </button>
+      <div className="library-gallery__item-actions">
+        <button
+          type="button"
+          className={clsx("library-gallery__item-action", {
+            "is-favorite": favorite,
+          })}
+          onClick={() => onToggleFavorite(item)}
+          title={favoriteLabel}
+          aria-label={favoriteLabel}
+          aria-pressed={favorite}
+        >
+          {favorite ? "★" : "☆"}
+        </button>
+        <button
+          type="button"
+          className="library-gallery__item-action"
+          onClick={() => onPreview(item)}
+          title={t("library.galleryPreview") as string}
+          aria-label={t("library.galleryPreview") as string}
+        >
+          ⤢
+        </button>
       </div>
-      <div className="library-gallery__item-meta">
-        <span className="library-gallery__item-name">{item.name}</span>
-        <span className="library-gallery__item-category">{item.category}</span>
-      </div>
-      <span className="library-gallery__item-insert">
-        {busy ? t("library.galleryInserting") : t("library.galleryInsert")}
-      </span>
-    </button>
+    </div>
   );
 };
 
 const ItemGrid = ({
   items,
   busyItemId,
+  favoriteIds,
   onInsert,
+  onToggleFavorite,
+  onPreview,
 }: {
   items: GalleryLibraryItem[];
   busyItemId: string | null;
+  favoriteIds: Set<string>;
   onInsert: (item: GalleryLibraryItem) => void;
+  onToggleFavorite: (item: GalleryLibraryItem) => void;
+  onPreview: (item: GalleryLibraryItem) => void;
 }) => {
   return (
     <div className="library-gallery__item-grid">
@@ -181,9 +234,78 @@ const ItemGrid = ({
           item={item}
           busy={busyItemId === item.id}
           disabled={busyItemId !== null}
+          favorite={favoriteIds.has(item.id)}
           onInsert={onInsert}
+          onToggleFavorite={onToggleFavorite}
+          onPreview={onPreview}
         />
       ))}
+    </div>
+  );
+};
+
+const PreviewDialog = ({
+  item,
+  busy,
+  onClose,
+  onInsert,
+}: {
+  item: GalleryLibraryItem;
+  busy: boolean;
+  onClose: () => void;
+  onInsert: (item: GalleryLibraryItem) => void;
+}) => {
+  return (
+    <div className="library-gallery__preview-backdrop" onClick={onClose}>
+      <div
+        className="library-gallery__preview-dialog"
+        role="dialog"
+        aria-modal="true"
+        aria-label={t("library.galleryPreviewTitle") as string}
+        onClick={(event) => event.stopPropagation()}
+      >
+        <div className="library-gallery__preview-header">
+          <div>
+            <h3>{item.name}</h3>
+            <p>{item.category}</p>
+          </div>
+          <button
+            type="button"
+            className="library-gallery__preview-close"
+            onClick={onClose}
+            aria-label={t("library.galleryClose") as string}
+            title={t("library.galleryClose") as string}
+          >
+            ×
+          </button>
+        </div>
+        <div className="library-gallery__preview-stage">
+          <LibraryPreview
+            key={item.id}
+            item={item}
+            className="library-gallery__preview-image"
+          />
+        </div>
+        <div className="library-gallery__preview-actions">
+          <button
+            type="button"
+            className="library-gallery__preview-secondary"
+            onClick={onClose}
+          >
+            {t("library.galleryClose")}
+          </button>
+          <button
+            type="button"
+            className="library-gallery__preview-primary"
+            disabled={busy}
+            onClick={() => onInsert(item)}
+          >
+            {busy
+              ? t("library.galleryInserting")
+              : t("library.galleryInsertToCanvas")}
+          </button>
+        </div>
+      </div>
     </div>
   );
 };
@@ -200,22 +322,27 @@ export const LibraryGallery = ({
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [query, setQuery] = useState("");
-  const [activeCategoryId, setActiveCategoryId] = useState<string | null>(null);
+  const [view, setView] = useState<GalleryView>(readSavedView);
   const [continuousInsert, setContinuousInsert] =
     useState(readContinuousInsert);
   const [busyItemId, setBusyItemId] = useState<string | null>(null);
   const [toast, setToast] = useState<string | null>(null);
   const [recentIds, setRecentIds] = useState<string[]>(readRecentItems);
+  const [favoriteIds, setFavoriteIds] = useState<string[]>(readFavoriteItems);
+  const [previewItem, setPreviewItem] = useState<GalleryLibraryItem | null>(
+    null,
+  );
 
   const searchInputRef = useRef<HTMLInputElement>(null);
   const toastTimerRef = useRef<number | null>(null);
 
   const activeCategory = useMemo(
     () =>
-      catalog?.categories.find(
-        (category) => category.id === activeCategoryId,
-      ) ?? null,
-    [catalog, activeCategoryId],
+      view.type === "category"
+        ? catalog?.categories.find((category) => category.id === view.id) ??
+          null
+        : null,
+    [catalog, view],
   );
 
   const normalizedQuery = query.trim().toLowerCase();
@@ -240,6 +367,18 @@ export const LibraryGallery = ({
       .slice(0, 8);
   }, [catalog, recentIds]);
 
+  const favoriteItems = useMemo(() => {
+    if (!catalog) {
+      return [];
+    }
+    const itemMap = new Map(catalog.items.map((item) => [item.id, item]));
+    return favoriteIds
+      .map((id) => itemMap.get(id))
+      .filter((item): item is GalleryLibraryItem => !!item);
+  }, [catalog, favoriteIds]);
+
+  const favoriteIdSet = useMemo(() => new Set(favoriteIds), [favoriteIds]);
+
   const showToast = useCallback((message: string) => {
     setToast(message);
     if (toastTimerRef.current !== null) {
@@ -250,6 +389,15 @@ export const LibraryGallery = ({
       toastTimerRef.current = null;
     }, 2400);
   }, []);
+
+  const closeGallery = useCallback(() => {
+    excalidrawAPI?.updateScene({
+      appState: {
+        openSidebar: { name: "default", tab: "library" },
+      },
+    });
+    onClose();
+  }, [excalidrawAPI, onClose]);
 
   const loadCatalog = useCallback(async (force: boolean) => {
     setLoading(true);
@@ -291,6 +439,24 @@ export const LibraryGallery = ({
   }, []);
 
   useEffect(() => {
+    try {
+      localStorage.setItem(LAST_VIEW_KEY, serializeView(view));
+    } catch {
+      // localStorage may be unavailable.
+    }
+  }, [view]);
+
+  useEffect(() => {
+    if (
+      catalog &&
+      view.type === "category" &&
+      !catalog.categories.some((category) => category.id === view.id)
+    ) {
+      setView({ type: "all" });
+    }
+  }, [catalog, view]);
+
+  useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
       if (event.key !== "Escape") {
         return;
@@ -298,18 +464,20 @@ export const LibraryGallery = ({
       event.preventDefault();
       event.stopPropagation();
 
-      if (query) {
+      if (previewItem) {
+        setPreviewItem(null);
+      } else if (query) {
         setQuery("");
-      } else if (activeCategoryId) {
-        setActiveCategoryId(null);
+      } else if (view.type !== "all") {
+        setView({ type: "all" });
       } else {
-        onClose();
+        closeGallery();
       }
     };
 
     window.addEventListener("keydown", onKeyDown, true);
     return () => window.removeEventListener("keydown", onKeyDown, true);
-  }, [activeCategoryId, onClose, query]);
+  }, [closeGallery, previewItem, query, view.type]);
 
   const rememberItem = useCallback((id: string) => {
     setRecentIds((previous) => {
@@ -317,14 +485,27 @@ export const LibraryGallery = ({
         0,
         MAX_RECENT_ITEMS,
       );
-      try {
-        localStorage.setItem(RECENT_ITEMS_KEY, JSON.stringify(next));
-      } catch {
-        // localStorage may be unavailable.
-      }
+      writeStringArray(RECENT_ITEMS_KEY, next);
       return next;
     });
   }, []);
+
+  const toggleFavorite = useCallback(
+    (item: GalleryLibraryItem) => {
+      const isFavorite = favoriteIds.includes(item.id);
+      const next = isFavorite
+        ? favoriteIds.filter((id) => id !== item.id)
+        : [item.id, ...favoriteIds];
+      setFavoriteIds(next);
+      writeStringArray(FAVORITE_ITEMS_KEY, next);
+      showToast(
+        isFavorite
+          ? t("library.galleryUnfavorited", { name: item.name })
+          : t("library.galleryFavorited", { name: item.name }),
+      );
+    },
+    [favoriteIds, showToast],
+  );
 
   const toggleContinuousInsert = useCallback(() => {
     setContinuousInsert((previous) => {
@@ -388,7 +569,6 @@ export const LibraryGallery = ({
                 .filter((element) => !isBoundToContainer(element))
                 .map((element) => [element.id, true]),
             ),
-            openSidebar: null,
           },
           captureUpdate: CaptureUpdateAction.IMMEDIATELY,
         });
@@ -402,7 +582,7 @@ export const LibraryGallery = ({
         );
 
         if (!continuousInsert) {
-          window.setTimeout(onClose, 220);
+          window.setTimeout(closeGallery, 220);
         }
       } catch (insertError: any) {
         showToast(
@@ -416,28 +596,54 @@ export const LibraryGallery = ({
     },
     [
       busyItemId,
+      closeGallery,
       continuousInsert,
       excalidrawAPI,
-      onClose,
       rememberItem,
       showToast,
     ],
   );
 
-  const resetToAll = useCallback(() => {
+  const selectView = useCallback((next: GalleryView) => {
     setQuery("");
-    setActiveCategoryId(null);
+    setView(next);
   }, []);
 
-  const selectCategory = useCallback((id: string) => {
-    setQuery("");
-    setActiveCategoryId(id);
-  }, []);
+  const resetToAll = useCallback(() => {
+    selectView({ type: "all" });
+  }, [selectView]);
+
+  const selectCategory = useCallback(
+    (id: string) => {
+      selectView({ type: "category", id });
+    },
+    [selectView],
+  );
 
   const refresh = useCallback(() => {
     clearLibraryCatalogCache();
     void loadCatalog(true);
   }, [loadCatalog]);
+
+  const openPreview = useCallback((item: GalleryLibraryItem) => {
+    setPreviewItem(item);
+  }, []);
+
+  const renderHeading = (title: string, count?: number) => (
+    <div className="library-gallery__section-heading">
+      <h3>{title}</h3>
+      {count !== undefined && (
+        <span>{t("library.galleryItems", { count })}</span>
+      )}
+    </div>
+  );
+
+  const renderEmpty = (title: string, message: string) => (
+    <div className="library-gallery__status library-gallery__status--compact">
+      <strong>{title}</strong>
+      <span>{message}</span>
+    </div>
+  );
 
   const renderBody = () => {
     if (loading) {
@@ -475,7 +681,10 @@ export const LibraryGallery = ({
             <ItemGrid
               items={searchResults}
               busyItemId={busyItemId}
+              favoriteIds={favoriteIdSet}
               onInsert={insertItem}
+              onToggleFavorite={toggleFavorite}
+              onPreview={openPreview}
             />
           ) : (
             <div className="library-gallery__status">
@@ -487,29 +696,68 @@ export const LibraryGallery = ({
       );
     }
 
-    if (activeCategory) {
+    if (view.type === "recent") {
       return (
         <section className="library-gallery__section">
-          <div className="library-gallery__section-heading">
-            <button
-              type="button"
-              className="library-gallery__back"
-              onClick={resetToAll}
-            >
-              ← {t("library.galleryAll")}
-            </button>
-            <h3>{activeCategory.name}</h3>
-            <span>
-              {t("library.galleryItems", {
-                count: activeCategory.items.length,
-              })}
-            </span>
-          </div>
-          <ItemGrid
-            items={activeCategory.items}
-            busyItemId={busyItemId}
-            onInsert={insertItem}
-          />
+          {renderHeading(t("library.galleryRecent"), recentItems.length)}
+          {recentItems.length ? (
+            <ItemGrid
+              items={recentItems}
+              busyItemId={busyItemId}
+              favoriteIds={favoriteIdSet}
+              onInsert={insertItem}
+              onToggleFavorite={toggleFavorite}
+              onPreview={openPreview}
+            />
+          ) : (
+            renderEmpty(
+              t("library.galleryRecent"),
+              t("library.galleryRecentEmpty"),
+            )
+          )}
+        </section>
+      );
+    }
+
+    if (view.type === "favorites") {
+      return (
+        <section className="library-gallery__section">
+          {renderHeading(t("library.galleryFavorites"), favoriteItems.length)}
+          {favoriteItems.length ? (
+            <ItemGrid
+              items={favoriteItems}
+              busyItemId={busyItemId}
+              favoriteIds={favoriteIdSet}
+              onInsert={insertItem}
+              onToggleFavorite={toggleFavorite}
+              onPreview={openPreview}
+            />
+          ) : (
+            renderEmpty(
+              t("library.galleryFavorites"),
+              t("library.galleryFavoritesEmpty"),
+            )
+          )}
+        </section>
+      );
+    }
+
+    if (view.type === "category" && activeCategory) {
+      return (
+        <section className="library-gallery__section">
+          {renderHeading(activeCategory.name, activeCategory.items.length)}
+          {activeCategory.items.length ? (
+            <ItemGrid
+              items={activeCategory.items}
+              busyItemId={busyItemId}
+              favoriteIds={favoriteIdSet}
+              onInsert={insertItem}
+              onToggleFavorite={toggleFavorite}
+              onPreview={openPreview}
+            />
+          ) : (
+            renderEmpty(activeCategory.name, t("library.galleryCategoryEmpty"))
+          )}
         </section>
       );
     }
@@ -524,40 +772,17 @@ export const LibraryGallery = ({
     }
 
     return (
-      <>
-        {recentItems.length > 0 && (
-          <section className="library-gallery__section">
-            <div className="library-gallery__section-heading">
-              <h3>{t("library.galleryRecent")}</h3>
-            </div>
-            <ItemGrid
-              items={recentItems}
-              busyItemId={busyItemId}
-              onInsert={insertItem}
-            />
-          </section>
-        )}
-
-        <section className="library-gallery__section">
-          <div className="library-gallery__section-heading">
-            <h3>{t("library.galleryCategories")}</h3>
-            <span>
-              {t("library.galleryCategoryCount", {
-                count: catalog.categories.length,
-              })}
-            </span>
-          </div>
-          <div className="library-gallery__category-grid">
-            {catalog.categories.map((category) => (
-              <CategoryCard
-                key={category.id}
-                category={category}
-                onOpen={selectCategory}
-              />
-            ))}
-          </div>
-        </section>
-      </>
+      <section className="library-gallery__section">
+        {renderHeading(t("library.galleryAllItems"), catalog.items.length)}
+        <ItemGrid
+          items={catalog.items}
+          busyItemId={busyItemId}
+          favoriteIds={favoriteIdSet}
+          onInsert={insertItem}
+          onToggleFavorite={toggleFavorite}
+          onPreview={openPreview}
+        />
+      </section>
     );
   };
 
@@ -581,7 +806,7 @@ export const LibraryGallery = ({
           <button
             type="button"
             className="library-gallery__close"
-            onClick={onClose}
+            onClick={closeGallery}
             aria-label={t("library.galleryClose")}
             title={t("library.galleryClose")}
           >
@@ -617,36 +842,78 @@ export const LibraryGallery = ({
             {t("library.galleryRefresh")}
           </button>
         </div>
-
-        {catalog && (
-          <div className="library-gallery__chips">
-            <button
-              type="button"
-              className={clsx("library-gallery__chip", {
-                "is-active": !activeCategoryId && !normalizedQuery,
-              })}
-              onClick={resetToAll}
-            >
-              {t("library.galleryAll")}
-            </button>
-            {catalog.categories.map((category) => (
-              <button
-                key={category.id}
-                type="button"
-                className={clsx("library-gallery__chip", {
-                  "is-active": activeCategoryId === category.id,
-                })}
-                onClick={() => selectCategory(category.id)}
-              >
-                {category.name}
-                <span>{category.items.length}</span>
-              </button>
-            ))}
-          </div>
-        )}
       </div>
 
-      <div className="library-gallery__body">{renderBody()}</div>
+      <div className="library-gallery__body">
+        <aside
+          className="library-gallery__rail"
+          aria-label={t("library.galleryCategories") as string}
+        >
+          <button
+            type="button"
+            className={clsx("library-gallery__rail-item", {
+              "is-active": view.type === "all" && !normalizedQuery,
+            })}
+            onClick={resetToAll}
+          >
+            {t("library.galleryAll")}
+            <span>{catalog?.items.length ?? 0}</span>
+          </button>
+          <button
+            type="button"
+            className={clsx("library-gallery__rail-item", {
+              "is-active": view.type === "recent" && !normalizedQuery,
+            })}
+            onClick={() => selectView({ type: "recent" })}
+          >
+            {t("library.galleryRecent")}
+            <span>{recentItems.length}</span>
+          </button>
+          <button
+            type="button"
+            className={clsx("library-gallery__rail-item", {
+              "is-active": view.type === "favorites" && !normalizedQuery,
+            })}
+            onClick={() => selectView({ type: "favorites" })}
+          >
+            {t("library.galleryFavorites")}
+            <span>{favoriteItems.length}</span>
+          </button>
+          <div className="library-gallery__rail-divider" />
+          <div className="library-gallery__rail-title">
+            {t("library.galleryCategories")}
+          </div>
+          {catalog?.categories.map((category) => (
+            <button
+              key={category.id}
+              type="button"
+              className={clsx("library-gallery__rail-item", {
+                "is-active":
+                  view.type === "category" &&
+                  view.id === category.id &&
+                  !normalizedQuery,
+              })}
+              onClick={() => selectCategory(category.id)}
+            >
+              {category.name}
+              <span>{category.items.length}</span>
+            </button>
+          ))}
+        </aside>
+        <main className="library-gallery__main">{renderBody()}</main>
+      </div>
+
+      {previewItem && (
+        <PreviewDialog
+          item={previewItem}
+          busy={busyItemId === previewItem.id}
+          onClose={() => setPreviewItem(null)}
+          onInsert={(item) => {
+            setPreviewItem(null);
+            void insertItem(item);
+          }}
+        />
+      )}
 
       {toast && <div className="library-gallery__toast">{toast}</div>}
     </div>,
