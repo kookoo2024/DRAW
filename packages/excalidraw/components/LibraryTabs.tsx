@@ -31,6 +31,7 @@ export const LibraryTabs = ({
   onReorder?: (orderedIds: string[]) => void | Promise<boolean> | boolean;
   actions?: React.ReactNode;
 }) => {
+  const getTabLabel = (name: string) => Array.from(name.trim())[0] ?? "";
   const [creating, setCreating] = useState(false);
   const [newName, setNewName] = useState("");
   const [busy, setBusy] = useState(false);
@@ -248,6 +249,7 @@ export const LibraryTabs = ({
                 });
               }}
               title={lib.name}
+              aria-label={lib.name}
               style={{
                 appearance: "none",
                 WebkitAppearance: "none",
@@ -269,7 +271,7 @@ export const LibraryTabs = ({
                 transition: "opacity 0.1s",
               }}
             >
-              {lib.name}
+              {getTabLabel(lib.name)}
             </button>
           );
         })}
