@@ -711,6 +711,31 @@ const ExcalidrawWrapper = () => {
 };
 
 const ExcalidrawApp = () => {
+  // ── 触摸屏/一体机修复（陈老师专用）─────────────────────────────
+  // 问题：长按图形时，画板弹出了自己的右键菜单，但浏览器原生右键菜单
+  //       也同时弹出并把它盖住。
+  // 原因：Excalidraw 的触摸长按是在 pointerdown 后 setTimeout 500ms 才
+  //       调 handleCanvasContextMenu()，那时 pointerdown 事件早已结束，
+  //       里面的 preventDefault() 拦不住浏览器另发的 contextmenu 事件。
+  // 解法：在 document 的捕获阶段统一拦掉原生菜单；输入框和文本编辑区
+  //       （contenteditable）保留原生菜单，方便复制粘贴。
+  useEffect(() => {
+    const onCtxMenu = (e: MouseEvent) => {
+      const target = e.target as HTMLElement | null;
+      if (!target) return;
+      if (
+        target.closest(
+          "input, textarea, [contenteditable='true'], [contenteditable='']",
+        )
+      ) {
+        return; // 输入区域保留浏览器原生菜单
+      }
+      e.preventDefault();
+    };
+    document.addEventListener("contextmenu", onCtxMenu, true);
+    return () => document.removeEventListener("contextmenu", onCtxMenu, true);
+  }, []);
+
   return (
     <TopErrorBoundary>
       <Provider store={appJotaiStore}>
