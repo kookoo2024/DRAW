@@ -252,8 +252,8 @@ const initializeScene = async (opts: {
     }),
     appState: {
       ...restoreAppState(localDataState?.appState, null),
-      // 每次新启动时强制默认缩放为 68%
-      zoom: { value: 0.68 as NormalizedZoomValue },
+      // 每次新启动时强制默认缩放为 65%
+      zoom: { value: 0.65 as NormalizedZoomValue },
     },
   };
 
