@@ -675,8 +675,14 @@ export interface ExcalidrawProps {
     getItemLibraryId: (itemId: LibraryItem["id"]) => string | null;
     onCreateLibrary?: (name: string) => Promise<boolean> | boolean;
     onDeleteLibrary?: (id: string) => Promise<boolean> | boolean;
-    onRenameLibrary?: (oldId: string, newName: string) => Promise<boolean> | boolean;
-    onReorderLibrary?: (orderedIds: string[]) => void | Promise<boolean> | boolean;
+    onRenameLibrary?: (
+      oldId: string,
+      newName: string,
+    ) => Promise<boolean> | boolean;
+    onReorderLibrary?: (
+      orderedIds: string[],
+    ) => void | Promise<boolean> | boolean;
+    onOpenLibraryGallery?: () => void;
   };
   autoFocus?: boolean;
   generateIdForFile?: (file: File) => string | Promise<string>;

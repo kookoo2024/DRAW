@@ -158,6 +158,7 @@ const LibraryMenuContent = memo(
           onDeleteLibrary={libraryConfig?.onDeleteLibrary}
           onRenameLibrary={libraryConfig?.onRenameLibrary}
           onReorderLibrary={libraryConfig?.onReorderLibrary}
+          onOpenGallery={libraryConfig?.onOpenLibraryGallery}
         />
       </LibraryMenuWrapper>
     );

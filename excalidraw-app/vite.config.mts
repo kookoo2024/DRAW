@@ -15,8 +15,18 @@ export default defineConfig(({ mode }) => {
   return {
     server: {
       port: Number(envVars.VITE_APP_PORT || 3000),
+      proxy: {
+        "/api": "http://localhost:80",
+        "/data": "http://localhost:80",
+      },
       // open the browser
       open: true,
+    },
+    preview: {
+      proxy: {
+        "/api": "http://localhost:80",
+        "/data": "http://localhost:80",
+      },
     },
     // We need to specify the envDir since now there are no
     //more located in parallel with the vite.config.ts file but in parent dir

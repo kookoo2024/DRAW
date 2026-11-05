@@ -69,7 +69,7 @@ import { useHandleAppTheme } from "./useHandleAppTheme";
 import { getPreferredLanguage } from "./app-language/language-detector";
 import { useAppLangCode } from "./app-language/language-state";
 
-// 多素材库 adapter —— 从 /libraries/*.excalidrawlib 加载所有分类库，
+// 多素材库 adapter —— 从 /data/libraries/*.excalidrawlib 加载所有分类库，
 // 并在增删素材时 POST 回写到对应库文件（浏览器直存服务器）。
 import {
   SharedLibraryAdapter,
@@ -84,6 +84,7 @@ import { useLibraries } from "./data/useLibraries";
 
 import { useAtomValue } from "./app-jotai";
 import { AppFooter } from "./components/AppFooter";
+import { LibraryGallery } from "./components/LibraryGallery";
 
 import "./index.scss";
 
@@ -268,6 +269,35 @@ const ExcalidrawWrapper = () => {
 
   const [langCode, setLangCode] = useAppLangCode();
 
+  const [isLibraryGalleryOpen, setIsLibraryGalleryOpen] = useState(
+    () => window.location.hash === "#library",
+  );
+
+  useEffect(() => {
+    const syncLibraryGalleryState = () => {
+      setIsLibraryGalleryOpen(window.location.hash === "#library");
+    };
+    window.addEventListener("hashchange", syncLibraryGalleryState);
+    return () =>
+      window.removeEventListener("hashchange", syncLibraryGalleryState);
+  }, []);
+
+  const openLibraryGallery = useCallback(() => {
+    setIsLibraryGalleryOpen(true);
+    if (window.location.hash !== "#library") {
+      window.location.hash = "library";
+    }
+  }, []);
+
+  const closeLibraryGallery = useCallback(() => {
+    window.history.replaceState(
+      {},
+      "",
+      `${window.location.pathname}${window.location.search}`,
+    );
+    setIsLibraryGalleryOpen(false);
+  }, []);
+
   // 多分类库：库清单 + 当前选中库
   const { libraries, currentId, select, reorder, reload } = useLibraries();
 
@@ -325,6 +355,7 @@ const ExcalidrawWrapper = () => {
       onDeleteLibrary: handleDeleteLibrary,
       onRenameLibrary: handleRenameLibrary,
       onReorderLibrary: reorder,
+      onOpenLibraryGallery: openLibraryGallery,
     }),
     [
       libraries,
@@ -334,6 +365,7 @@ const ExcalidrawWrapper = () => {
       handleDeleteLibrary,
       handleRenameLibrary,
       reorder,
+      openLibraryGallery,
     ],
   );
 
@@ -356,7 +388,7 @@ const ExcalidrawWrapper = () => {
     }, VERSION_TIMEOUT);
   }, []);
 
-  // 多素材库 + 浏览器直存：adapter 从 /libraries/*.excalidrawlib 加载所有库，
+  // 多素材库 + 浏览器直存：adapter 从 /data/libraries/*.excalidrawlib 加载所有库，
   // 并在增删素材时 POST 回写到对应库文件（save 不再是 no-op）。
   useHandleLibrary({
     excalidrawAPI,
@@ -706,6 +738,12 @@ const ExcalidrawWrapper = () => {
           </ErrorDialog>
         )}
       </Excalidraw>
+      {isLibraryGalleryOpen && (
+        <LibraryGallery
+          excalidrawAPI={excalidrawAPI}
+          onClose={closeLibraryGallery}
+        />
+      )}
     </div>
   );
 };

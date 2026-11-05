@@ -13,9 +13,9 @@ import type {
  * 多素材库 + 浏览器直存方案
  *
  * 服务器侧（FireCloud 已支持，无需改源码）：
- *   GET  /api/list?path=libraries        → 列出所有库文件
- *   GET  /libraries/<name>.excalidrawlib → 读某个库
- *   POST /api/upload?path=libraries/<name>.excalidrawlib → 写某个库
+ *   GET  /api/list?path=data/libraries        → 列出所有库文件
+ *   GET  /data/libraries/<name>.excalidrawlib → 读某个库
+ *   POST /api/upload?path=data/libraries/<name>.excalidrawlib → 写某个库
  *
  * 每个分类库 = libraries 目录下一个 .excalidrawlib 文件。
  * 库清单（id/显示名/排序）由这些文件推导：
@@ -27,7 +27,7 @@ import type {
  * 时能把变更正确回写到对应的库文件。
  */
 
-const LIBRARIES_DIR = "libraries";
+const LIBRARIES_DIR = "data/libraries";
 
 /** 库清单条目：一个分类库的描述 */
 export type LibraryMeta = {

@@ -38,10 +38,7 @@ import { Button } from "./Button";
 
 import type { ExcalidrawLibraryIds } from "../data/types";
 
-import type {
-  LibraryItem,
-  LibraryItems,
-} from "../types";
+import type { LibraryItem, LibraryItems } from "../types";
 
 // using an odd number of items per batch so the rendering creates an irregular
 // pattern which looks more organic
@@ -68,6 +65,7 @@ export default function LibraryMenuItems({
   onDeleteLibrary,
   onRenameLibrary,
   onReorderLibrary,
+  onOpenGallery,
 }: {
   isLoading: boolean;
   libraryItems: LibraryItems;
@@ -84,8 +82,14 @@ export default function LibraryMenuItems({
   getItemLibraryId?: (itemId: LibraryItem["id"]) => string | null;
   onCreateLibrary?: (name: string) => Promise<boolean> | boolean;
   onDeleteLibrary?: (id: string) => Promise<boolean> | boolean;
-  onRenameLibrary?: (oldId: string, newName: string) => Promise<boolean> | boolean;
-  onReorderLibrary?: (orderedIds: string[]) => void | Promise<boolean> | boolean;
+  onRenameLibrary?: (
+    oldId: string,
+    newName: string,
+  ) => Promise<boolean> | boolean;
+  onReorderLibrary?: (
+    orderedIds: string[],
+  ) => void | Promise<boolean> | boolean;
+  onOpenGallery?: () => void;
 }) {
   const editorInterface = useEditorInterface();
   const libraryContainerRef = useRef<HTMLDivElement>(null);
@@ -122,7 +126,13 @@ export default function LibraryMenuItems({
       // map 未命中时（时序/新库），单库场景归到当前库
       return libCount <= 1;
     });
-  }, [libraryItems, MULTI_LIBRARY, currentLibraryId, getItemLibraryId, libraries]);
+  }, [
+    libraryItems,
+    MULTI_LIBRARY,
+    currentLibraryId,
+    getItemLibraryId,
+    libraries,
+  ]);
 
   const IS_LIBRARY_EMPTY =
     !itemsInCurrentLibrary.length && !pendingElements.length;
@@ -147,7 +157,9 @@ export default function LibraryMenuItems({
   // 多库模式下不再区分 published/unpublished，统一用当前库的素材
   const unpublishedItems = useMemo(
     () =>
-      MULTI_LIBRARY ? [] : itemsInCurrentLibrary.filter((item) => item.status !== "published"),
+      MULTI_LIBRARY
+        ? []
+        : itemsInCurrentLibrary.filter((item) => item.status !== "published"),
     [itemsInCurrentLibrary, MULTI_LIBRARY],
   );
 
@@ -317,8 +329,8 @@ export default function LibraryMenuItems({
             {MULTI_LIBRARY
               ? t("library.hint_emptyMultiLibrary")
               : publishedItems.length > 0
-                ? t("library.hint_emptyPrivateLibrary")
-                : t("library.hint_emptyLibrary")}
+              ? t("library.hint_emptyPrivateLibrary")
+              : t("library.hint_emptyLibrary")}
           </div>
         </div>
       ) : (
@@ -459,6 +471,16 @@ export default function LibraryMenuItems({
           onReloadLibrary={onReloadLibrary}
           className="library-menu-dropdown-container--in-heading"
         />
+        {onOpenGallery && (
+          <button
+            type="button"
+            className="library-menu-gallery-button"
+            onClick={onOpenGallery}
+            title={t("library.openGallery") as string}
+          >
+            {t("library.openGallery") as string}
+          </button>
+        )}
       </div>
       <Stack.Col
         className="library-menu-items-container__items"
